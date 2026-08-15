@@ -7,6 +7,40 @@ export default function AITools() {
     const [aiResults, setAiResults] = useState<any>(null);
     const [error, setError] = useState<string>('');
     const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [creating, setCreating] = useState(false);
+
+    const handleCreateProduct = async () => {
+        if (!aiResults?.aiIdentification?.productName) return;
+        setCreating(true);
+        try {
+            const defaultSku = `SKU-AI-${Math.floor(Math.random() * 90000) + 10000}`;
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: aiResults.aiIdentification.productName,
+                    sku: defaultSku,
+                    category: 'General',
+                    purchasePrice: 0,
+                    sellingPrice: 0,
+                    stockLevel: 0
+                })
+            });
+
+            if (res.ok) {
+                const newProduct = await res.json();
+                // Instantly inject the newly constructed entity directly into the UI state bypassing full round-trip refreshing
+                setAiResults({
+                    ...aiResults,
+                    catalogMatches: [newProduct]
+                });
+            }
+        } catch (e) {
+            console.error("Failed to map AI to Database:", e);
+        } finally {
+            setCreating(false);
+        }
+    };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -195,7 +229,13 @@ export default function AITools() {
                                         {aiResults.catalogMatches?.length === 0 && (
                                             <div className="text-sm text-muted-foreground italic p-2 bg-muted rounded">
                                                 No DB products matched this AI scan snippet.
-                                                <button className="text-primary underline block mt-2 font-medium">Create New Product</button>
+                                                <button
+                                                    onClick={handleCreateProduct}
+                                                    disabled={creating}
+                                                    className="text-primary underline block mt-2 font-medium disabled:opacity-50"
+                                                >
+                                                    {creating ? "Adding to Catalog..." : "One-Click Add to Live Inventory"}
+                                                </button>
                                             </div>
                                         )}
                                     </div>

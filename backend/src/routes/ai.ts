@@ -80,7 +80,7 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
             const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
                 method: 'POST',
                 body: formData
-            }, 120000); // 120s explicit timeout limit for CPU Native Inference constraints
+            }, 240000); // 240s explicit timeout limit supporting high resolution uncompressed offline pictures
 
             if (!response.ok) {
                 const errorStr = await response.text();
