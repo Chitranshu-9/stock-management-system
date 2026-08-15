@@ -3,19 +3,25 @@ import {
     LayoutDashboard,
     PackageSearch,
     ScanLine,
+    Package,
+    History,
+    Scan,
     ShoppingCart,
-    FileBarChart,
-    Settings
+    ShoppingBag,
+    PieChart,
+    Settings as SettingsIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: PackageSearch, label: 'Inventory', path: '/inventory' },
-    { icon: ScanLine, label: 'AI Tools', path: '/ai-tools' },
-    { icon: ShoppingCart, label: 'Sales & POS', path: '/sales' },
-    { icon: FileBarChart, label: 'Reports', path: '/reports' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: Package, label: 'Inventory', path: '/inventory' },
+    { icon: History, label: 'Stock Ledger', path: '/inventory/ledger' },
+    { icon: Scan, label: 'AI Scanner', path: '/ai-tools' },
+    { icon: ShoppingCart, label: 'GST Billing & POS', path: '/sales' },
+    { icon: ShoppingBag, label: 'Purchase Orders', path: '/purchases' },
+    { icon: PieChart, label: 'Reports', path: '/reports' },
+    { icon: SettingsIcon, label: 'Settings', path: '/settings' },
 ];
 
 export function Sidebar() {
