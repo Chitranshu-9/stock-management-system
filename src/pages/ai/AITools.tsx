@@ -4,14 +4,63 @@ import { Camera, Image as ImageIcon, Sparkles, CheckCircle2 } from 'lucide-react
 export default function AITools() {
     const [scanning, setScanning] = useState(false);
     const [scanned, setScanned] = useState(false);
+    const [aiResults, setAiResults] = useState<any>(null);
+    const [error, setError] = useState<string>('');
+    const [previewUrl, setPreviewUrl] = useState<string>('');
 
-    const simulateScan = () => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // UX Reflection - Allow user to see what they actually uploaded
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(URL.createObjectURL(file));
+
         setScanning(true);
         setScanned(false);
-        setTimeout(() => {
-            setScanning(false);
+        setError('');
+        setAiResults(null);
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/ai/scan', {
+                method: 'POST',
+                body: formData // Content-Type omitted dynamically for Multer boundaries
+            });
+
+            if (!res.ok) {
+                // Inversion Protection: Vite proxy might return 502/504 HTML if backend crashes.
+                // Blindly awaiting res.json() here throws a SyntaxError and crashes React fetch handler!
+                const textStr = await res.text();
+                let errMessage = `HTTP ${res.status}: Failed to process image.`;
+                try {
+                    const parsed = JSON.parse(textStr);
+                    errMessage = parsed.error || errMessage;
+                } catch (e) {
+                    if (textStr.includes('ECONNREFUSED') || textStr.includes('504')) {
+                        errMessage = 'Critical: Backend Node Server is offline or proxy failed.';
+                    } else if (res.status === 413) {
+                        errMessage = 'File too large (exceeds 5MB limits).';
+                    }
+                }
+
+                setError(errMessage);
+                setScanning(false);
+                return;
+            }
+
+            const data = await res.json();
+            setAiResults(data);
             setScanned(true);
-        }, 2500);
+        } catch (err: any) {
+            setError(`Network level failure: ${err.message}`);
+        } finally {
+            setScanning(false);
+            // Optionally clear file input so user can re-select same file:
+            e.target.value = '';
+        }
     };
 
     return (
@@ -34,8 +83,12 @@ export default function AITools() {
                     <div className="flex-1 p-6 flex flex-col items-center justify-center bg-muted/30 relative">
                         {scanning ? (
                             <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
-                                <div className="relative w-64 h-64 bg-card rounded-lg border-2 border-primary/50 shadow-2xl flex items-center justify-center">
-                                    <PackagePlaceholder />
+                                <div className="relative w-64 h-64 bg-card rounded-lg border-2 border-primary/50 shadow-2xl flex items-center justify-center overflow-hidden">
+                                    {previewUrl ? (
+                                        <img src={previewUrl} alt="Scan Target" className="w-full h-full object-cover opacity-70" />
+                                    ) : (
+                                        <PackagePlaceholder />
+                                    )}
                                     {/* Scanning Animation */}
                                     <div className="absolute top-0 left-0 w-full h-1 bg-primary shadow-[0_0_15px_rgba(79,70,229,0.8)] animate-pulse" style={{ animation: 'scan 2s ease-in-out infinite alternate' }} />
                                 </div>
@@ -49,17 +102,38 @@ export default function AITools() {
                   }
                 `}</style>
                             </div>
+                        ) : scanned && previewUrl ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center relative">
+                                <div className="relative w-64 h-64 bg-card rounded-lg border-2 border-success/50 shadow-md flex items-center justify-center overflow-hidden">
+                                    <img src={previewUrl} alt="Scanned Result" className="w-full h-full object-cover" />
+                                    {error && <div className="absolute inset-0 bg-destructive/20" />}
+                                </div>
+                                <div className="mt-6 flex gap-3">
+                                    <input type="file" accept="image/jpeg, image/png" capture="environment" onChange={handleImageUpload} className="hidden" id="camera-upload-retry" />
+                                    <label htmlFor="camera-upload-retry" className="px-5 py-2 cursor-pointer border border-border bg-card text-foreground font-medium rounded-full shadow-sm flex items-center gap-2 hover:bg-muted transition-all active:scale-95">
+                                        <Camera className="w-4 h-4" /> Scan Another
+                                    </label>
+                                </div>
+                            </div>
                         ) : (
                             <div className="space-y-4 text-center">
                                 <div className="w-24 h-24 bg-card border border-dashed border-border rounded-xl flex items-center justify-center mx-auto shadow-sm">
                                     <ImageIcon className="w-10 h-10 text-muted-foreground" />
                                 </div>
                                 <div>
-                                    <button onClick={simulateScan} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm">
-                                        Capture Shelf
-                                    </button>
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg, image/png"
+                                        capture="environment"
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                        id="camera-upload"
+                                    />
+                                    <label htmlFor="camera-upload" className="px-4 py-2 cursor-pointer bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm inline-flex items-center">
+                                        Scan using Camera
+                                    </label>
                                     <p className="mt-3 text-xs text-muted-foreground max-w-[200px] mx-auto">
-                                        Drag and drop images, or click to use device camera.
+                                        Take a picture or upload an image for SmolVLM processing.
                                     </p>
                                 </div>
                             </div>
@@ -90,40 +164,53 @@ export default function AITools() {
                                 <p className="text-sm">Querying vector database...</p>
                             </div>
                         )}
-                        {scanned && (
+                        {scanned && aiResults && !error && (
                             <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="p-4 rounded-lg border border-border bg-background shadow-sm hover:border-primary/50 transition-colors">
                                     <div className="flex justify-between items-start mb-2">
-                                        <div className="font-semibold text-lg">Premium Cooking Oil 1L</div>
-                                        <span className="flex items-center gap-1 text-sm font-medium text-success bg-success/10 px-2.5 py-0.5 rounded-full">
-                                            <CheckCircle2 className="w-4 h-4" /> 98% Match
+                                        <div className="font-semibold text-lg">{aiResults.aiIdentification?.productName || 'Unknown Product'}</div>
+                                        <span className={`flex items-center gap-1 text-sm font-medium px-2.5 py-0.5 rounded-full ${aiResults.aiIdentification?.confidence > 0.85 ? 'bg-success/15 text-success' : 'bg-amber-500/15 text-amber-500'}`}>
+                                            <CheckCircle2 className="w-4 h-4" /> {Math.round((aiResults.aiIdentification?.confidence || 0) * 100)}% Match
                                         </span>
                                     </div>
-                                    <div className="text-sm text-muted-foreground flex gap-4 mb-4">
-                                        <span>SKU: OIL-001</span>
-                                        <span>Category: Grocery</span>
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        Provider: {aiResults.inferenceProvider}
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">Confirm & Add Stock</button>
-                                        <button className="flex-1 bg-secondary text-foreground border border-input py-1.5 rounded-md text-sm font-medium hover:bg-secondary/80 transition-colors">Edit Match</button>
+
+                                    <div className="border-t border-border pt-4">
+                                        <h3 className="text-xs uppercase font-semibold text-muted-foreground mb-3">Live Catalog Matches ({aiResults.catalogMatches?.length || 0})</h3>
+
+                                        {aiResults.catalogMatches?.map((match: any) => (
+                                            <div key={match._id} className="flex justify-between items-center py-2 border-b border-border last:border-0">
+                                                <div>
+                                                    <p className="font-medium text-sm">{match.name}</p>
+                                                    <p className="text-xs text-muted-foreground">SKU: {match.sku} | Unit: {match.unit}</p>
+                                                </div>
+                                                <button className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-md text-xs font-medium transition-colors">
+                                                    Select
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {aiResults.catalogMatches?.length === 0 && (
+                                            <div className="text-sm text-muted-foreground italic p-2 bg-muted rounded">
+                                                No DB products matched this AI scan snippet.
+                                                <button className="text-primary underline block mt-2 font-medium">Create New Product</button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="p-4 rounded-lg border border-border bg-background shadow-sm hover:border-primary/50 transition-colors">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="font-semibold text-lg">Herbal Shampoo 200ml</div>
-                                        <span className="flex items-center gap-1 text-sm font-medium text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full">
-                                            <CheckCircle2 className="w-4 h-4" /> 84% Match
-                                        </span>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground flex gap-4 mb-4">
-                                        <span>SKU: SHMP-200</span>
-                                        <span>Category: Personal Care</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button className="flex-1 bg-primary text-primary-foreground py-1.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">Confirm & Add Stock</button>
-                                        <button className="flex-1 bg-secondary text-foreground border border-input py-1.5 rounded-md text-sm font-medium hover:bg-secondary/80 transition-colors">Edit Match</button>
-                                    </div>
+                        {error && (
+                            <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in duration-300">
+                                <div className="bg-destructive/10 border border-destructive/20 text-destructive p-6 rounded-xl max-w-sm">
+                                    <h3 className="font-semibold mb-2">AI Processing Failed</h3>
+                                    <p className="text-sm opacity-90">{error}</p>
+                                    <button onClick={() => setError('')} className="mt-4 bg-destructive text-destructive-foreground px-4 py-2 rounded-md text-sm font-medium">
+                                        Try Again
+                                    </button>
                                 </div>
                             </div>
                         )}

@@ -18,9 +18,66 @@ export default function POS() {
         setCart(cart.filter(item => item.id !== id));
     };
 
-    const handleSimulateScan = () => {
-        const newItem = { id: Date.now(), name: 'Herbal Shampoo 200ml', price: 140, qty: 1 };
-        setCart([...cart, newItem]);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanError, setScanError] = useState('');
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsScanning(true);
+        setScanError('');
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/ai/scan', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const textStr = await res.text();
+                let errMessage = `HTTP ${res.status}: Failed`;
+                try {
+                    const parsed = JSON.parse(textStr);
+                    errMessage = parsed.error || errMessage;
+                } catch (e) {
+                    if (textStr.includes('ECONNREFUSED') || textStr.includes('504')) {
+                        errMessage = 'Backend Offline';
+                    } else if (res.status === 413) {
+                        errMessage = 'File too large';
+                    }
+                }
+                setScanError(errMessage);
+                return;
+            }
+
+            const data = await res.json();
+
+            if (data.catalogMatches && data.catalogMatches.length > 0) {
+                const match = data.catalogMatches[0];
+                const existingItem = cart.find(item => item.id === match._id);
+
+                if (existingItem) {
+                    updateQty(existingItem.id, 1);
+                } else {
+                    setCart([...cart, {
+                        id: match._id || Date.now(),
+                        name: match.name,
+                        price: match.sellingPrice || 0,
+                        qty: 1
+                    }]);
+                }
+            } else {
+                setScanError('Product not recognized in catalog');
+            }
+        } catch (err) {
+            setScanError('Network error to AI engine');
+        } finally {
+            setIsScanning(false);
+        }
     };
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
@@ -64,21 +121,39 @@ export default function POS() {
                                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" />
                                 <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" />
 
-                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                                    <ScanLine className="w-12 h-12 text-primary opacity-50" />
-                                    <p className="text-sm font-medium text-muted-foreground">Position product in frame</p>
-                                </div>
+                                {isScanning ? (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/50 backdrop-blur-sm z-10">
+                                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-sm font-medium text-primary shadow-sm">AI Engine Scanning...</p>
+                                    </div>
+                                ) : (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                                        <ScanLine className="w-12 h-12 text-primary opacity-50" />
+                                        <p className="text-sm font-medium text-muted-foreground">Position product in frame</p>
+                                        {scanError && <p className="text-xs text-destructive bg-destructive/10 px-2 py-1 rounded">{scanError}</p>}
+                                    </div>
+                                )}
                             </div>
-                            <button
-                                onClick={handleSimulateScan}
-                                className="mt-8 px-6 py-3 bg-secondary border border-border text-foreground hover:bg-muted font-medium rounded-full shadow-sm flex items-center gap-2 active:scale-95 transition-all">
-                                <Fingerprint className="w-4 h-4" /> Simulate Scan Success
-                            </button>
+
+                            <div className="mt-8">
+                                <input
+                                    type="file"
+                                    accept="image/jpeg, image/png"
+                                    capture="environment"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                    id="pos-camera-upload"
+                                    disabled={isScanning}
+                                />
+                                <label htmlFor="pos-camera-upload" className={`px-6 py-3 bg-secondary border border-border text-foreground font-medium rounded-full shadow-sm flex items-center gap-2 transition-all ${isScanning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted cursor-pointer active:scale-95'}`}>
+                                    <Camera className="w-4 h-4" /> Capture Product
+                                </label>
+                            </div>
                         </div>
                     ) : (
                         <div className="absolute inset-0 p-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto">
                             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                                <div key={i} onClick={handleSimulateScan} className="border border-border bg-card rounded-xl p-3 flex flex-col gap-2 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors active:scale-95 group">
+                                <div key={i} onClick={() => { }} className="border border-border bg-card rounded-xl p-3 flex flex-col gap-2 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors active:scale-95 group">
                                     <div className="w-full aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
                                         <span className="text-muted-foreground text-xs font-mono">Image</span>
                                         <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />

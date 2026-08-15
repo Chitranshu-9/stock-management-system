@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth';
+import aiRoutes from './routes/ai';
 
 const app = express();
 
@@ -15,7 +16,8 @@ app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', message: 'API is running' });
 });
 
-// Authentication Routes
+// Mounted Routers
 app.use('/api/auth', authRoutes);
+app.use('/api/ai', aiRoutes);
 
 export default app;
