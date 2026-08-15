@@ -1,7 +1,48 @@
-import { PackageSearch } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { PackageSearch, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Login() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!res.ok) {
+                if (res.status === 429) {
+                    setError('Too many attempts! Account is locked for 2 minutes.');
+                } else if (res.status === 403) {
+                    setError('Business account is suspended.');
+                } else {
+                    const data = await res.json();
+                    setError(data.error || 'Invalid credentials');
+                }
+                setIsLoading(false);
+                return;
+            }
+
+            // Successfully logged in (HttpOnly cookies handle the rest securely)
+            // Redirect to dashboard
+            navigate('/');
+        } catch (err) {
+            setError('Failed to connect to the server. Please check backend.');
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex text-foreground bg-background">
             <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
@@ -17,18 +58,44 @@ export default function Login() {
                     </div>
 
                     <div className="mt-8">
-                        <form action="#" method="POST" className="space-y-6">
+                        {error && (
+                            <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-destructive text-sm font-medium">
+                                <AlertCircle className="w-4 h-4" />
+                                {error}
+                            </div>
+                        )}
+                        <form onSubmit={handleLogin} className="space-y-6">
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium">Email address</label>
                                 <div className="mt-1">
-                                    <input id="email" name="email" type="email" autoComplete="email" required className="block w-full border border-input bg-card rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm" placeholder="admin@example.com" />
+                                    <input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        autoComplete="email"
+                                        required
+                                        className="block w-full border border-input bg-card rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm"
+                                        placeholder="admin@example.com"
+                                    />
                                 </div>
                             </div>
 
                             <div>
                                 <label htmlFor="password" className="block text-sm font-medium">Password</label>
                                 <div className="mt-1">
-                                    <input id="password" name="password" type="password" autoComplete="current-password" required className="block w-full border border-input bg-card rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm" placeholder="••••••••" />
+                                    <input
+                                        id="password"
+                                        name="password"
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        autoComplete="current-password"
+                                        required
+                                        className="block w-full border border-input bg-card rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm"
+                                        placeholder="••••••••"
+                                    />
                                 </div>
                             </div>
 
@@ -44,8 +111,8 @@ export default function Login() {
                             </div>
 
                             <div>
-                                <button type="submit" className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors">
-                                    Sign in
+                                <button disabled={isLoading} type="submit" className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors disabled:opacity-70">
+                                    {isLoading ? 'Signing in...' : 'Sign in'}
                                 </button>
                             </div>
                         </form>

@@ -28,9 +28,9 @@ export default function POS() {
     const total = subtotal + tax;
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6 -m-4 sm:m-0">
+        <div className="h-auto lg:h-[calc(100vh-8rem)] min-h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6 -m-4 sm:m-0">
             {/* Left Pane: Scanner or Grid */}
-            <div className="flex-1 flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+            <div className="flex-1 min-h-[450px] lg:min-h-0 flex flex-col bg-card border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-border bg-secondary/30 flex items-center justify-between gap-4">
                     <h2 className="font-semibold text-lg">Product Entry</h2>
                     <div className="flex bg-background border border-input rounded-lg p-1">

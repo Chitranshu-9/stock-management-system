@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Moon, Sun, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { Search, Bell, Moon, Sun, AlertTriangle, CheckCircle2, Info, Menu } from 'lucide-react';
 import { useTheme } from '../theme-provider';
 
 const mockNotifications = [
@@ -8,7 +8,7 @@ const mockNotifications = [
     { id: 3, type: 'info', title: 'System Update', desc: 'New AI weights deployed.', time: '1d ago', unread: false },
 ];
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     const { theme, setTheme } = useTheme();
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState(mockNotifications);
@@ -41,8 +41,14 @@ export function Header() {
     };
 
     return (
-        <header className="h-16 border-b border-border bg-card/50 backdrop-blur-[2px] sticky top-0 z-40 flex items-center justify-between px-6">
-            <div className="flex items-center flex-1">
+        <header className="h-16 border-b border-border bg-card/50 backdrop-blur-[2px] sticky top-0 z-40 flex items-center justify-between px-4 md:px-6">
+            <div className="flex items-center flex-1 gap-3">
+                <button
+                    onClick={onMenuClick}
+                    className="md:hidden flex items-center justify-center w-10 h-10 text-muted-foreground hover:bg-secondary rounded-md transition-colors"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
                 <div className="relative w-96 hidden md:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
