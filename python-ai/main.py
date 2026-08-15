@@ -52,7 +52,8 @@ async def analyze_image(image: UploadFile = File(...)):
         # Native CPU Optimization: Explicitly bound physical image dimensions to prevent quadratic attention processing overloads
         pil_image.thumbnail((768, 768))
         
-        prompt = "Identify the very specific noun for the physical product in this image in 5 words or less. Be highly specific (e.g., 'Air Conditioner Remote', 'Nylon Hammer'). Never use generic words like 'Device' or 'Object'."
+        # Simple, non-constrained prompt. Tiny ML models interpret complex negative constraints identically to positive constraints!
+        prompt = "What is the primary physical item shown in this image? Answer with just the basic name."
         
         messages = [
             {
