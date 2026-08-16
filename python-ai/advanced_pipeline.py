@@ -202,8 +202,8 @@ async def recognize_live(file: UploadFile = File(...)):
     
     img_a = img_rgb.shape[0] * img_rgb.shape[1]
     
-    # Execute YOLO Segment boundaries. Raise floor to 0.15 to avoid fabric hallucinations
-    res = yolo_model(img_rgb, conf=0.15, iou=0.40)
+    # 1. Open the Floodgates: 0.03 Confidence allows YOLO to pick up weakly shaped instances (Toothsi Box)
+    res = yolo_model(img_rgb, conf=0.03, iou=0.40)
     
     detected_items = []
     
@@ -298,20 +298,28 @@ async def recognize_live(file: UploadFile = File(...)):
             }
                         
             # DINOv2 Mask Artifact Tolerance Adjustment
-            # Pure black bordering reduces similarity globally natively. 0.82 combined with Margin > 0.02 is virtually bulletproof.
+            # Pure black bordering reduces similarity globally natively. 0.81 is the optimized bound.
             if best_match and best_sim > 0.81 and margin > 0.02:
                 det_payload["confidence"] = best_sim
                 det_payload["category"] = catalog[best_match]["name"]
                 det_payload["sku"] = catalog[best_match]["sku"]
                 det_payload["provider"] = "DINOv2 Vector Network"
                 det_payload["margin"] = margin
+                detected_items.append(det_payload)
             else:
+                # 2. DUAL-GATE DROPPING
+                # If YOLO confidence is extremely weak (< 0.15), AND DINOv2 failed to map it to an actual identity,
+                # It is ALMOST CERTAINLY a background hallucination (fabric/wood/shadows).
+                # To prevent UI SPAM natively, we drop it from the UI payload instead of outputting "Unclassifiable Shape".
+                if y_conf < 0.15:
+                    continue
+                    
                 det_payload["confidence"] = best_sim if best_match else y_conf
                 det_payload["category"] = "Unclassifiable Shape"
                 if best_match:
                     det_payload["margin"] = margin
                 
-            detected_items.append(det_payload)
+                detected_items.append(det_payload)
             
     return {
         "job_id": job_id,
