@@ -1,13 +1,39 @@
-import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Loader2 } from 'lucide-react';
 
-const mockLedger = [
-    { id: 'TRX-1092', date: '14 Aug 2026', type: 'Sale', ref: 'INV-8821', product: 'Premium Cooking Oil', qtyIn: 0, qtyOut: 12, balance: 108, user: 'Admin' },
-    { id: 'TRX-1091', date: '14 Aug 2026', type: 'Purchase', ref: 'PO-0045', product: 'Herbal Shampoo 200ml', qtyIn: 50, qtyOut: 0, balance: 58, user: 'Warehouse' },
-    { id: 'TRX-1090', date: '13 Aug 2026', type: 'Adjustment', ref: 'ADJ-112', product: 'Basmati Rice 5kg', qtyIn: 0, qtyOut: 2, balance: 43, user: 'Manager' },
-    { id: 'TRX-1089', date: '13 Aug 2026', type: 'Transfer', ref: 'TRF-009', product: 'Cola Drink 2L', qtyIn: 20, qtyOut: 0, balance: 85, user: 'Manager' },
-];
+interface StockMovement {
+    _id: string;
+    type: 'Purchase' | 'Sale' | 'Adjustment' | 'Transfer';
+    referenceId: string;
+    productName: string;
+    quantityIn: number;
+    quantityOut: number;
+    balanceAfter: number;
+    performedBy: string;
+    createdAt: string;
+}
 
 export default function InventoryLedger() {
+    const [ledger, setLedger] = useState<StockMovement[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        fetch('/api/inventory/ledger')
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to authenticate Ledger access");
+                return res.json();
+            })
+            .then(data => {
+                setLedger(data);
+                setLoading(false);
+            })
+            .catch(e => {
+                setError(e.message);
+                setLoading(false);
+            });
+    }, []);
+
     const getTypeIcon = (type: string) => {
         switch (type) {
             case 'Sale': return <ArrowUpRight className="w-4 h-4 text-destructive" />;
@@ -49,22 +75,30 @@ export default function InventoryLedger() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {mockLedger.map((trx) => (
-                                <tr key={trx.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 text-muted-foreground">{trx.date}</td>
-                                    <td className="px-6 py-4 font-mono font-medium">{trx.id}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            {getTypeIcon(trx.type)}
-                                            <span>{trx.type}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium">{trx.product}</td>
-                                    <td className="px-6 py-4 text-right text-success font-medium">{trx.qtyIn > 0 ? `+${trx.qtyIn}` : '-'}</td>
-                                    <td className="px-6 py-4 text-right text-destructive font-medium">{trx.qtyOut > 0 ? `-${trx.qtyOut}` : '-'}</td>
-                                    <td className="px-6 py-4 text-right font-bold">{trx.balance}</td>
-                                </tr>
-                            ))}
+                            {loading ? (
+                                <tr><td colSpan={7} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" /></td></tr>
+                            ) : error ? (
+                                <tr><td colSpan={7} className="text-center py-10 text-destructive">{error}</td></tr>
+                            ) : ledger.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No ledger transactions recorded yet.</td></tr>
+                            ) : (
+                                ledger.map((trx) => (
+                                    <tr key={trx._id} className="hover:bg-muted/50 transition-colors">
+                                        <td className="px-6 py-4 text-muted-foreground">{new Date(trx.createdAt).toLocaleDateString()} {new Date(trx.createdAt).toLocaleTimeString()}</td>
+                                        <td className="px-6 py-4 font-mono font-medium">{trx.referenceId}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {getTypeIcon(trx.type)}
+                                                <span>{trx.type}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-medium">{trx.productName}</td>
+                                        <td className="px-6 py-4 text-right text-success font-medium">{trx.quantityIn > 0 ? `+${trx.quantityIn}` : '-'}</td>
+                                        <td className="px-6 py-4 text-right text-destructive font-medium">{trx.quantityOut > 0 ? `-${trx.quantityOut}` : '-'}</td>
+                                        <td className="px-6 py-4 text-right font-bold">{trx.balanceAfter}</td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

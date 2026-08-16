@@ -68,18 +68,18 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
             throw new Error('CRITICAL FATAL: JWT_SECRET missing in production');
         }
 
-        // Generate Access Token (15 mins)
+        // Generate Access Token (7 days)
         const accessToken = jwt.sign(
             { userId: user._id, tenantId: user.tenantId, role: user.role },
             secret || 'fallback-secret-development',
-            { expiresIn: '15m' }
+            { expiresIn: '7d' }
         );
 
-        // Generate Refresh Token (7 days)
+        // Generate Refresh Token (30 days)
         const refreshToken = jwt.sign(
             { userId: user._id },
             refreshSecret,
-            { expiresIn: '7d' }
+            { expiresIn: '30d' }
         );
 
         // Assign HTTPOnly cookies
@@ -87,14 +87,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 mins
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
 
         res.json({
@@ -141,14 +141,14 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
         const newAccessToken = jwt.sign(
             { userId: user._id, tenantId: user.tenantId, role: user.role },
             secret,
-            { expiresIn: '15m' }
+            { expiresIn: '7d' }
         );
 
         res.cookie('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 mins
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
         res.json({ message: 'Token refreshed successfully' });

@@ -118,6 +118,7 @@ class EnrollRequest(BaseModel):
     sku: str
     name: str
     product_id: Optional[str] = None
+    tenant_id: str
 
 @app.post("/api/v2/embeddings/enroll")
 async def enroll_product(req: EnrollRequest):
@@ -128,6 +129,7 @@ async def enroll_product(req: EnrollRequest):
     sku = req.sku
     name = req.name
     product_id = req.product_id or sku
+    tenant_id = req.tenant_id
     
     if image_path.startswith('/'):
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
@@ -169,29 +171,38 @@ async def enroll_product(req: EnrollRequest):
         outputs = dino_model(**inputs)
         anchor = outputs.last_hidden_state.mean(dim=1).squeeze().cpu().numpy().tolist()
         
-    if product_id not in visual_gallery:
-        visual_gallery[product_id] = []
+    if tenant_id not in visual_gallery:
+        visual_gallery[tenant_id] = {}
+        catalog[tenant_id] = {}
         
-    for existing in visual_gallery[product_id]:
+    tenant_gallery = visual_gallery[tenant_id]
+    tenant_catalog = catalog[tenant_id]
+        
+    if product_id not in tenant_gallery:
+        tenant_gallery[product_id] = []
+        
+    for existing in tenant_gallery[product_id]:
         if existing.get("image_path") == image_path:
-            return {"status": "unchanged", "profile_size": len(visual_gallery[product_id])}
+            return {"status": "unchanged", "profile_size": len(tenant_gallery[product_id])}
     
-    visual_gallery[product_id].append({
+    tenant_gallery[product_id].append({
         "vector_id": str(uuid.uuid4()),
         "embedding": anchor,
         "type": "reference",
         "image_path": image_path
     })
     
-    catalog[product_id] = {
+    tenant_catalog[product_id] = {
         "sku": sku,
         "name": name
     }
     
-    return {"status": "success", "profile_size": len(visual_gallery[product_id])}
+    return {"status": "success", "profile_size": len(tenant_gallery[product_id])}
+
+from fastapi import Form
 
 @app.post("/api/v2/recognition/jobs")
-async def recognize_live(file: UploadFile = File(...)):
+async def recognize_live(file: UploadFile = File(...), tenant_id: str = Form(...)):
     global visual_gallery
     
     job_id = f"rec_{uuid.uuid4().hex[:8]}"
@@ -249,6 +260,10 @@ async def recognize_live(file: UploadFile = File(...)):
             if not is_nested:
                 valid_indices.append(i)
             
+        # Bind safely to tenant's localized database subset
+        tenant_gallery = visual_gallery.get(tenant_id, {})
+        tenant_catalog = catalog.get(tenant_id, {})
+            
         for i in valid_indices:
             bbox = bboxes[i]
             y_conf = float(yolo_confs[i])
@@ -266,7 +281,7 @@ async def recognize_live(file: UploadFile = File(...)):
                 live_embedding = outputs.last_hidden_state.mean(dim=1).squeeze().cpu().numpy()
                 
             candidate_scores = []
-            for prod_id, vectors in visual_gallery.items():
+            for prod_id, vectors in tenant_gallery.items():
                 product_best_sim = 0.0
                 for vec in vectors:
                     ref_emb = np.array(vec["embedding"])
@@ -301,8 +316,8 @@ async def recognize_live(file: UploadFile = File(...)):
             # Pure black bordering reduces similarity globally natively. 0.81 is the optimized bound.
             if best_match and best_sim > 0.81 and margin > 0.02:
                 det_payload["confidence"] = best_sim
-                det_payload["category"] = catalog[best_match]["name"]
-                det_payload["sku"] = catalog[best_match]["sku"]
+                det_payload["category"] = tenant_catalog[best_match]["name"]
+                det_payload["sku"] = tenant_catalog[best_match]["sku"]
                 det_payload["provider"] = "DINOv2 Vector Network"
                 det_payload["margin"] = margin
                 detected_items.append(det_payload)

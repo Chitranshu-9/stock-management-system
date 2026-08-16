@@ -1,14 +1,50 @@
-import { Search, Filter, Plus, FileDown, MoreHorizontal } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, Plus, FileDown, MoreHorizontal, Loader2 } from 'lucide-react';
 
-const mockProducts = [
-    { id: 1, sku: 'OIL-001', name: 'Premium Cooking Oil', category: 'Grocery', price: '₹450', stock: 120, status: 'In Stock' },
-    { id: 2, sku: 'SHMP-200', name: 'Herbal Shampoo 200ml', category: 'Personal Care', price: '₹140', stock: 8, status: 'Low Stock' },
-    { id: 3, sku: 'RCE-05', name: 'Basmati Rice 5kg', category: 'Grocery', price: '₹550', stock: 45, status: 'In Stock' },
-    { id: 4, sku: 'SNK-CH', name: 'Chocolate Cookies', category: 'Snacks', price: '₹80', stock: 0, status: 'Out of Stock' },
-    { id: 5, sku: 'DRK-CL', name: 'Cola Drink 2L', category: 'Beverages', price: '₹95', stock: 65, status: 'In Stock' },
-];
+interface Product {
+    _id: string;
+    sku: string;
+    name: string;
+    category: string;
+    sellingPrice: number;
+    currentStock: number;
+    aiTrainingImages: string[];
+}
 
 export default function ProductList() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const query = search ? `?search=${encodeURIComponent(search)}` : '';
+                const res = await fetch(`/api/products${query}`);
+                if (!res.ok) throw new Error("Failed to load products");
+                const data = await res.json();
+                setProducts(data);
+                setLoading(false);
+            } catch (err: any) {
+                setError(err.message);
+                setLoading(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            fetchProducts();
+        }, search ? 300 : 0);
+
+        return () => clearTimeout(timeoutId);
+    }, [search]);
+
+    const getStatus = (stock: number) => {
+        if (stock <= 0) return { text: 'Out of Stock', classes: 'bg-destructive/15 text-destructive' };
+        if (stock <= 5) return { text: 'Low Stock', classes: 'bg-orange-500/15 text-orange-600' };
+        return { text: 'In Stock', classes: 'bg-success/15 text-success' };
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -35,6 +71,8 @@ export default function ProductList() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
                             type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search by product name, SKU, or barcode..."
                             className="w-full h-9 pl-9 pr-4 rounded-md border border-input bg-background/50 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                         />
@@ -66,35 +104,44 @@ export default function ProductList() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {mockProducts.map((product) => (
-                                <tr key={product.id} className="hover:bg-muted/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center border border-border">
-                                                <span className="text-muted-foreground text-xs font-mono">IMG</span>
+                            {loading ? (
+                                <tr><td colSpan={7} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" /></td></tr>
+                            ) : error ? (
+                                <tr><td colSpan={7} className="text-center py-10 text-destructive">{error}</td></tr>
+                            ) : products.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No products found in Catalog.</td></tr>
+                            ) : (
+                                products.map((product) => (
+                                    <tr key={product._id} className="hover:bg-muted/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center border border-border overflow-hidden">
+                                                    {product.aiTrainingImages?.length > 0 ? (
+                                                        <img src={product.aiTrainingImages[0]} alt={product.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-xs font-mono">IMG</span>
+                                                    )}
+                                                </div>
+                                                <div className="font-medium text-foreground">{product.name}</div>
                                             </div>
-                                            <div className="font-medium text-foreground">{product.name}</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-muted-foreground">{product.sku}</td>
-                                    <td className="px-6 py-4">{product.category}</td>
-                                    <td className="px-6 py-4 font-medium">{product.price}</td>
-                                    <td className="px-6 py-4">{product.stock}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${product.status === 'In Stock' ? 'bg-success/15 text-success' :
-                                                product.status === 'Low Stock' ? 'bg-orange-500/15 text-orange-600' :
-                                                    'bg-destructive/15 text-destructive'
-                                            }`}>
-                                            {product.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button className="text-muted-foreground hover:text-foreground p-1 transition-colors">
-                                            <MoreHorizontal className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-muted-foreground">{product.sku}</td>
+                                        <td className="px-6 py-4">{product.category}</td>
+                                        <td className="px-6 py-4 font-medium">₹{product.sellingPrice}</td>
+                                        <td className="px-6 py-4">{product.currentStock}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${getStatus(product.currentStock).classes}`}>
+                                                {getStatus(product.currentStock).text}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="text-muted-foreground hover:text-foreground p-1 transition-colors">
+                                                <MoreHorizontal className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

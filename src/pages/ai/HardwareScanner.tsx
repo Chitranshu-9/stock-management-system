@@ -8,6 +8,7 @@ export default function HardwareScanner() {
     const [error, setError] = useState<string>('');
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [savingStates, setSavingStates] = useState<Record<string, boolean | 'SUCCESS'>>({});
+    const [quantities, setQuantities] = useState<Record<string, number>>({});
 
     // Edit & Autocomplete states
     const [editModeId, setEditModeId] = useState<string | null>(null);
@@ -71,6 +72,7 @@ export default function HardwareScanner() {
             formData.append('image', blob, `crop_${item.detection_id}.png`);
             formData.append('name', item.category);
             if (item.sku) formData.append('sku', item.sku);
+            formData.append('quantity', String(quantities[item.detection_id] || 1));
 
             // Post directly to the dedicated AI-ingest route
             const res = await fetch('/api/products/ai-ingest', {
@@ -117,6 +119,15 @@ export default function HardwareScanner() {
             }
 
             const data = await res.json();
+
+            // Initialize quantities to 1 natively
+            const initialQuantities: Record<string, number> = {};
+            if (data.items) {
+                data.items.forEach((item: any) => {
+                    initialQuantities[item.detection_id] = 1;
+                });
+            }
+            setQuantities(initialQuantities);
             setAiResults(data);
             setScanned(true);
         } catch (err: any) {
@@ -292,21 +303,39 @@ export default function HardwareScanner() {
                                             </div>
                                         </div>
 
-                                        <div className="mt-3 pt-3 border-t border-border/50, flex flex-col items-end">
-                                            <button
-                                                onClick={() => handleSaveItem(item)}
-                                                disabled={savingStates[item.detection_id] === true || savingStates[item.detection_id] === 'SUCCESS'}
-                                                className={`text-xs px-4 py-2 font-medium rounded-md transition-all shadow-sm flex items-center justify-center ${savingStates[item.detection_id] === 'SUCCESS'
-                                                    ? 'bg-success/20 text-success border border-success/30'
-                                                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                    } disabled:opacity-70`}
-                                            >
-                                                {savingStates[item.detection_id] === 'SUCCESS'
-                                                    ? '✓ Saved to Catalog'
-                                                    : savingStates[item.detection_id] === true
-                                                        ? 'Syncing Core...'
-                                                        : 'Add +1 Stock to DB'}
-                                            </button>
+                                        <div className="mt-3 pt-3 border-t border-border/50 flex flex-col items-end">
+                                            <div className="flex items-center gap-3">
+                                                {!savingStates[item.detection_id] && (
+                                                    <div className="flex items-center bg-background border border-border rounded-md px-2 py-1 shadow-sm">
+                                                        <span className="text-xs text-muted-foreground mr-2 font-medium">Qty:</span>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={quantities[item.detection_id] || 1}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                                setQuantities(prev => ({ ...prev, [item.detection_id]: val }));
+                                                            }}
+                                                            className="w-12 text-sm font-bold bg-transparent outline-none text-center"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => handleSaveItem(item)}
+                                                    disabled={savingStates[item.detection_id] === true || savingStates[item.detection_id] === 'SUCCESS'}
+                                                    className={`text-xs px-4 py-2 font-medium rounded-md transition-all shadow-sm flex items-center justify-center ${savingStates[item.detection_id] === 'SUCCESS'
+                                                        ? 'bg-success/20 text-success border border-success/30'
+                                                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                        } disabled:opacity-70`}
+                                                >
+                                                    {savingStates[item.detection_id] === 'SUCCESS'
+                                                        ? '✓ Saved to Catalog'
+                                                        : savingStates[item.detection_id] === true
+                                                            ? 'Syncing Core...'
+                                                            : `Add ${quantities[item.detection_id] || 1} Stock`}
+                                                </button>
+                                            </div>
                                             <span className="text-[10px] text-muted-foreground mt-2">Iteratively constructs Image Embeddings (RAG)</span>
                                         </div>
                                     </div>

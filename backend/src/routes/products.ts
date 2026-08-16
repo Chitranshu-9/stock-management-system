@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
+import StockMovement from '../models/StockMovement';
 
 const router = Router();
 
@@ -74,7 +75,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user.tenantId;
-        const { name, sku, category } = req.body;
+        const { name, sku, category, quantity } = req.body;
+
+        const numericQty = quantity ? parseInt(quantity, 10) : 1;
+        const finalQty = isNaN(numericQty) || numericQty < 1 ? 1 : numericQty;
 
         if (!name) {
             res.status(400).json({ error: 'Valid Name required.' });
@@ -95,16 +99,43 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
                 category: category || 'General-Scanned',
                 purchasePrice: 0,
                 sellingPrice: 0,
-                currentStock: 1,
+                currentStock: finalQty,
                 aiTrainingImages: imagePath ? [imagePath] : []
             });
+
+            // Generate Native Ledger Bootstrap
+            await StockMovement.create({
+                tenantId,
+                productId: product._id,
+                productName: product.name,
+                type: 'Adjustment',
+                referenceId: `AI-BOOT-${Date.now()}`,
+                quantityIn: finalQty,
+                quantityOut: 0,
+                balanceAfter: finalQty,
+                performedBy: (req as any).user.email || 'AI'
+            });
+
         } else if (imagePath) {
             if (!product.aiTrainingImages) {
                 product.aiTrainingImages = [];
             }
             product.aiTrainingImages.push(imagePath);
-            product.currentStock += 1; // Native counting increment
+            product.currentStock += finalQty; // Dynamic counting increment
             await product.save();
+
+            // Generate Native Ledger Adjustments
+            await StockMovement.create({
+                tenantId,
+                productId: product._id,
+                productName: product.name,
+                type: 'Adjustment',
+                referenceId: `AI-SCAN-${Date.now()}`,
+                quantityIn: finalQty,
+                quantityOut: 0,
+                balanceAfter: product.currentStock,
+                performedBy: (req as any).user.email || 'AI'
+            });
         }
 
         if (imagePath) {
@@ -112,7 +143,7 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
                 await fetch('http://127.0.0.1:8002/api/v2/embeddings/enroll', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_path: imagePath, sku: product.sku, name: product.name })
+                    body: JSON.stringify({ image_path: imagePath, sku: product.sku, name: product.name, tenant_id: tenantId })
                 });
             } catch (err: any) {
                 console.warn("Failed to instantly cache RAG Embedding:", err.message);
@@ -138,7 +169,7 @@ router.get('/bootstrap-ai', async (req: Request, res: Response): Promise<void> =
                         await fetch('http://127.0.0.1:8002/api/v2/embeddings/enroll', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image_path: img, sku: p.sku, name: p.name })
+                            body: JSON.stringify({ image_path: img, sku: p.sku, name: p.name, tenant_id: p.tenantId })
                         });
                         count++;
                     } catch (e) { }

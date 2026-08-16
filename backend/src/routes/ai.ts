@@ -154,6 +154,7 @@ router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: N
 
         // Note: FastAPI expects the field 'file', not 'image'
         formData.append('file', blob, req.file.originalname || 'upload.jpg');
+        formData.append('tenant_id', (req as any).user.tenantId);
 
         const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
             method: 'POST',
