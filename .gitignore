@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Machine Learning Artifacts
+test-images/
+backend/uploads/
+python-ai/*.pt
+python-ai/*.jpeg
+python-ai/*.jpg
+python-ai/*.png
