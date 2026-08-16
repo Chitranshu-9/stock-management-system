@@ -6,6 +6,7 @@ import Register from './pages/auth/Register';
 import ProductList from './pages/inventory/ProductList';
 import InventoryLedger from './pages/inventory/InventoryLedger';
 import AITools from './pages/ai/AITools';
+import HardwareScanner from './pages/ai/HardwareScanner';
 import POS from './pages/sales/POS';
 import Invoice from './pages/sales/Invoice';
 import PurchaseOrders from './pages/purchases/PurchaseOrders';
@@ -24,6 +25,7 @@ function App() {
           <Route path="inventory/ledger" element={<InventoryLedger />} />
           <Route path="purchases" element={<PurchaseOrders />} />
           <Route path="ai-tools" element={<AITools />} />
+          <Route path="hardware-scan" element={<HardwareScanner />} />
           <Route path="sales" element={<POS />} />
           <Route path="sales/invoice" element={<Invoice />} />
           <Route path="reports" element={<Reports />} />

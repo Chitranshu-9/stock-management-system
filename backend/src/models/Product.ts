@@ -16,6 +16,7 @@ export interface IProduct extends Document {
     gstRate: number;
     currentStock: number;
     reorderLevel: number;
+    aiTrainingImages?: string[];
 }
 
 const productSchema = new Schema({
@@ -33,7 +34,8 @@ const productSchema = new Schema({
     mrp: { type: Number, required: true, default: 0 },
     gstRate: { type: Number, required: true, default: 0 },
     currentStock: { type: Number, required: true, default: 0 },
-    reorderLevel: { type: Number, required: true, default: 10 }
+    reorderLevel: { type: Number, required: true, default: 10 },
+    aiTrainingImages: [{ type: String }]
 }, {
     timestamps: true
 });

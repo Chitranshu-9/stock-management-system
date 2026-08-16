@@ -12,6 +12,10 @@ app.use(cors({ origin: true, credentials: true })); // allow frontend proxy
 app.use(express.json());
 app.use(cookieParser());
 
+// Expose Hard Disk images reliably over public local endpoints
+import path from 'path';
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+
 // Routes Placeholder
 app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', message: 'API is running' });

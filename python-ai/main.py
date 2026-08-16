@@ -53,7 +53,7 @@ async def analyze_image(image: UploadFile = File(...)):
         pil_image.thumbnail((768, 768))
         
         # Simple, non-constrained prompt. Tiny ML models interpret complex negative constraints identically to positive constraints!
-        prompt = "What is the primary physical item shown in this image? Answer with just the basic name."
+        prompt = "What is the primary physical object shown in this image? Answer with just the basic name. If it is just a close-up of a table, floor, fabric, or meaningless background, reply exactly with the word 'BACKGROUND_NOISE'."
         
         messages = [
             {

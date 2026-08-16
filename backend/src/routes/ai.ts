@@ -132,4 +132,45 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
     }
 });
 
+
+// ==========================================
+// NEW HARDWARE BBOX PIPELINE (FastAPI YOLO)
+// ==========================================
+router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: NextFunction) => {
+    upload.single('image')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        next();
+    });
+}, async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ error: 'Image Payload missing.' });
+            return;
+        }
+
+        const LOCAL_PYTHON_ENDPOINT = 'http://127.0.0.1:8002/api/v2/recognition/jobs';
+        const formData = new FormData();
+        const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
+
+        // Note: FastAPI expects the field 'file', not 'image'
+        formData.append('file', blob, req.file.originalname || 'upload.jpg');
+
+        const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
+            method: 'POST',
+            body: formData
+        }, 240000);
+
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`YOLO Python Bridge Fault: ${txt}`);
+        }
+
+        const jsonResult = await response.json();
+        res.status(200).json(jsonResult);
+    } catch (e: any) {
+        console.error("Hardware Pipeline Proxy Error:", e.message);
+        res.status(502).json({ error: e.message || 'YOLO Backend Failed' });
+    }
+});
+
 export default router;
