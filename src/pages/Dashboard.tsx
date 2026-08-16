@@ -1,7 +1,36 @@
-import React from 'react';
-import { Package, TrendingUp, AlertTriangle, IndianRupee } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, TrendingUp, AlertTriangle, IndianRupee, Loader2 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 export default function Dashboard() {
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        fetch('/api/inventory/overview')
+            .then(res => {
+                if (!res.ok) throw new Error("Dashboard metrics restricted or offline");
+                return res.json();
+            })
+            .then(data => {
+                setStats(data);
+                setLoading(false);
+            })
+            .catch(e => {
+                setError(e.message);
+                setLoading(false);
+            });
+    }, []);
+
+    if (loading) {
+        return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    }
+
+    if (error) {
+        return <div className="p-6 text-destructive bg-destructive/10 rounded-md border border-destructive">Failed to load Dashboard: {error}</div>;
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -17,40 +46,57 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
                     title="Total Inventory Value"
-                    value="₹ 14.5L"
+                    value={`₹${stats.valuation.toLocaleString('en-IN')}`}
                     icon={<IndianRupee className="w-5 h-5 text-primary" />}
-                    trend="+5.2% from last month"
+                    trend="Based on active Selling Prices"
                     goodTrend={true}
                 />
                 <Card
                     title="Products in Stock"
-                    value="1,245"
+                    value={stats.totalItems.toLocaleString('en-IN')}
                     icon={<Package className="w-5 h-5 text-blue-500" />}
-                    trend="85 low stock alerts"
-                    goodTrend={false}
+                    trend={`${stats.skus} Unique Core SKUs tracked`}
+                    goodTrend={true}
                 />
                 <Card
                     title="Today's Sales"
-                    value="₹ 32,450"
+                    value={`₹${stats.todaySales.toLocaleString('en-IN')}`}
                     icon={<TrendingUp className="w-5 h-5 text-success" />}
-                    trend="+12% vs avg tuesday"
+                    trend="Transactions securely verified"
                     goodTrend={true}
                 />
                 <Card
                     title="Critical Alerts"
-                    value="3"
+                    value={stats.lowStockAlerts.toString()}
                     icon={<AlertTriangle className="w-5 h-5 text-destructive" />}
-                    trend="Require immediate action"
-                    goodTrend={false}
+                    trend={stats.lowStockAlerts > 0 ? "Requires immediate action" : "Operational capacity optimal"}
+                    goodTrend={stats.lowStockAlerts === 0}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Chart Area */}
                 <div className="lg:col-span-2 border border-border bg-card rounded-xl shadow-sm p-6">
-                    <h2 className="text-lg font-semibold mb-4">Sales & Adjustments Trend</h2>
-                    <div className="h-64 flex items-center justify-center border-2 border-dashed border-border rounded-lg bg-secondary/20">
-                        <span className="text-muted-foreground text-sm font-medium">Chart visualization area (e.g. Recharts)</span>
+                    <h2 className="text-lg font-semibold mb-4">Sales & Adjustments Trend (Dynamic Volume)</h2>
+                    <div className="h-64 flex items-center justify-center rounded-lg">
+                        {stats.chartData && stats.chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                                    <Tooltip
+                                        cursor={{ fill: '#f3f4f6' }}
+                                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                    />
+                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Bar dataKey="additions" name="Items Added" fill="#4338ca" radius={[4, 4, 0, 0]} barSize={30} />
+                                    <Bar dataKey="sales" name="Sales Dispense" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <span className="text-muted-foreground text-sm font-medium">Insufficient timeline data available natively.</span>
+                        )}
                     </div>
                 </div>
 
@@ -64,17 +110,15 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex-1 space-y-4">
-                        <div className="bg-secondary/50 rounded-lg p-3 text-sm">
-                            <p className="font-medium text-foreground">Action Required</p>
-                            <p className="text-muted-foreground mt-1">12 products are below their reorder levels. Recommend initiating a PO to 'Fresh Mart Suppliers'.</p>
-                        </div>
-                        <div className="bg-secondary/50 rounded-lg p-3 text-sm">
-                            <p className="font-medium text-foreground">Trend Analysis</p>
-                            <p className="text-muted-foreground mt-1">'Organic Honey 1L' sales are up 40% this week. Consider moving it to frontend display.</p>
-                        </div>
+                        {stats.insights && stats.insights.map((insight: any, i: number) => (
+                            <div key={i} className="bg-secondary/50 rounded-lg p-3 text-sm">
+                                <p className={`font-medium ${insight.type.includes('Required') ? 'text-destructive' : 'text-foreground'}`}>{insight.type}</p>
+                                <p className="text-muted-foreground mt-1">{insight.message}</p>
+                            </div>
+                        ))}
                     </div>
-                    <button className="mt-4 w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-                        Ask AI Assistant
+                    <button className="mt-4 w-full h-9 rounded-md bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors border border-border">
+                        Generative Stock Strategy
                     </button>
                 </div>
             </div>
