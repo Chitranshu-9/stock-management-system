@@ -18,6 +18,8 @@ export default function InventoryLedger() {
     const [ledger, setLedger] = useState<StockMovement[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [filterDate, setFilterDate] = useState('');
+    const [filterType, setFilterType] = useState('All');
 
     useEffect(() => {
         fetch(API_ENDPOINTS.INVENTORY.LEDGER)
@@ -43,6 +45,20 @@ export default function InventoryLedger() {
             default: return <ArrowRightLeft className="w-4 h-4 text-blue-500" />;
         }
     };
+    const filteredLedger = ledger.filter(trx => {
+        // [Inversion Logic] Exclude if dates inherently mismatch mapping robustly over internal ISO boundary drops globally
+        if (filterDate) {
+            const trxDate = new Date(trx.createdAt).toISOString().split('T')[0];
+            if (trxDate !== filterDate) return false;
+        }
+
+        // [Inversion Logic] Exclude if strict movement categoricals uniquely contradict
+        if (filterType !== 'All' && trx.type !== filterType) {
+            return false;
+        }
+
+        return true;
+    });
 
     return (
         <div className="space-y-6">
@@ -55,11 +71,21 @@ export default function InventoryLedger() {
                 <div className="p-4 border-b border-border flex gap-4">
                     <input
                         type="date"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
                         className="px-3 py-1.5 border border-input rounded-md text-sm bg-background text-foreground"
                     />
-                    <button className="px-3 py-1.5 border border-input bg-background rounded-md text-sm font-medium hover:bg-secondary transition-colors">
-                        Filter by Movement Type
-                    </button>
+                    <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        className="px-3 py-1.5 border border-input bg-background rounded-md text-sm font-medium hover:bg-secondary transition-colors"
+                    >
+                        <option value="All">All Movements</option>
+                        <option value="Sale">Sale</option>
+                        <option value="Purchase">Purchase</option>
+                        <option value="Adjustment">Adjustment</option>
+                        <option value="Transfer">Transfer</option>
+                    </select>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -80,10 +106,10 @@ export default function InventoryLedger() {
                                 <tr><td colSpan={7} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" /></td></tr>
                             ) : error ? (
                                 <tr><td colSpan={7} className="text-center py-10 text-destructive">{error}</td></tr>
-                            ) : ledger.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No ledger transactions recorded yet.</td></tr>
+                            ) : filteredLedger.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">No ledger transactions match the applied filters.</td></tr>
                             ) : (
-                                ledger.map((trx) => (
+                                filteredLedger.map((trx) => (
                                     <tr key={trx._id} className="hover:bg-muted/50 transition-colors">
                                         <td className="px-6 py-4 text-muted-foreground">{new Date(trx.createdAt).toLocaleDateString()} {new Date(trx.createdAt).toLocaleTimeString()}</td>
                                         <td className="px-6 py-4 font-mono font-medium">{trx.referenceId}</td>
