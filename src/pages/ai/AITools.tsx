@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Camera, Image as ImageIcon, Sparkles, CheckCircle2 } from 'lucide-react';
+import { API_ENDPOINTS } from '../../config/endpoints';
 
 export default function AITools() {
     const [scanning, setScanning] = useState(false);
@@ -14,7 +15,7 @@ export default function AITools() {
         setCreating(true);
         try {
             const defaultSku = `SKU-AI-${Math.floor(Math.random() * 90000) + 10000}`;
-            const res = await fetch('/api/products', {
+            const res = await fetch(API_ENDPOINTS.PRODUCTS.BASE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -35,8 +36,9 @@ export default function AITools() {
                     catalogMatches: [newProduct]
                 });
             }
-        } catch (e) {
-            console.error("Failed to map AI to Database:", e);
+        } catch (e: any) {
+            setCreating(false);
+            setError(e.message || "Failed to map");
         } finally {
             setCreating(false);
         }
@@ -59,7 +61,7 @@ export default function AITools() {
         formData.append('image', file);
 
         try {
-            const res = await fetch('/api/ai/scan', {
+            const res = await fetch(API_ENDPOINTS.AI.SINGLE_SCAN, {
                 method: 'POST',
                 body: formData // Content-Type omitted dynamically for Multer boundaries
             });

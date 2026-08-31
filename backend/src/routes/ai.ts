@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
+import FormData from 'form-data';
+import { PYTHON_ENDPOINTS } from '../config/endpoints';
 // import { z } from 'zod'; // Useful for strict parsing later
 
 const router = Router();
@@ -63,7 +65,7 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
         }
 
         // Hardcoded Native Python Host Binding
-        const LOCAL_PYTHON_ENDPOINT = 'http://127.0.0.1:8000/api/analyze-inventory-image';
+        const LOCAL_PYTHON_ENDPOINT = PYTHON_ENDPOINTS.RECOGNITION_JOBS;
 
         let aiJsonResult = null;
 
@@ -79,7 +81,7 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
             console.log(`[2] Establishing TCP Socket to Native Python Backend Engine...`);
             const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
                 method: 'POST',
-                body: formData
+                body: formData as any
             }, 240000); // 240s explicit timeout limit supporting high resolution uncompressed offline pictures
 
             if (!response.ok) {
@@ -148,26 +150,48 @@ router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: N
             return;
         }
 
-        const LOCAL_PYTHON_ENDPOINT = 'http://127.0.0.1:8002/api/v2/recognition/jobs';
-        const formData = new FormData();
-        const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
+        console.log(`\n\n[POS TRACE] Native API Ingestion: ${req.file.originalname} | Size: ${req.file.size || req.file.buffer.length}`);
 
-        // Note: FastAPI expects the field 'file', not 'image'
-        formData.append('file', blob, req.file.originalname || 'upload.jpg');
+        const LOCAL_PYTHON_ENDPOINT = PYTHON_ENDPOINTS.RECOGNITION_JOBS;
+        const formData = new FormData();
+
+        // Use third-party FormData mapping raw MultiPart boundary payload seamlessly bypassing native 'undici'
+        formData.append('file', req.file.buffer, { filename: req.file.originalname || 'upload.jpg', contentType: req.file.mimetype });
         formData.append('tenant_id', (req as any).user.tenantId);
 
         const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
             method: 'POST',
-            body: formData
+            body: formData.getBuffer() as any,
+            headers: formData.getHeaders()
         }, 240000);
 
         if (!response.ok) {
             const txt = await response.text();
+            console.error("[POS TRACE] Python Bridge Error:", txt);
             throw new Error(`YOLO Python Bridge Fault: ${txt}`);
         }
 
         const jsonResult = await response.json();
-        res.status(200).json(jsonResult);
+        console.log("[POS TRACE] Python Original JSON Return:");
+        console.log(JSON.stringify(jsonResult, null, 2));
+
+        // ------------------------------------------------------------------
+        // INVERSION COMPLIANCE: Hydrate Native Geometry with Business Ledger
+        // ------------------------------------------------------------------
+        const skus = (jsonResult.items || []).map((i: any) => i.sku).filter(Boolean);
+        console.log(`[POS TRACE] Extracted ChromDB SKUs:`, skus);
+
+        const catalogMatches = skus.length > 0
+            ? await Product.find({ sku: { $in: skus }, tenantId: (req as any).user.tenantId })
+            : [];
+
+        console.log(`[POS TRACE] Retrieved MongoDB Overlaps:`, catalogMatches.map(c => c.sku));
+
+        // Return perfectly merged geometrical bounding mapping combined seamlessly with DB Ledgers
+        res.status(200).json({
+            ...jsonResult,
+            catalogMatches
+        });
     } catch (e: any) {
         console.error("Hardware Pipeline Proxy Error:", e.message);
         res.status(502).json({ error: e.message || 'YOLO Backend Failed' });

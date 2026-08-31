@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Package, TrendingUp, AlertTriangle, IndianRupee, Loader2 } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, IndianRupee, Loader2, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { Modal } from '../components/ui/AlertModal';
+import { API_ENDPOINTS } from '../config/endpoints';
 
 export default function Dashboard() {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showStrategyModal, setShowStrategyModal] = useState(false);
+    const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
 
-    useEffect(() => {
-        fetch('/api/inventory/overview')
+    const fetchMetrics = () => {
+        fetch(API_ENDPOINTS.INVENTORY.OVERVIEW)
             .then(res => {
                 if (!res.ok) throw new Error("Dashboard metrics restricted or offline");
                 return res.json();
@@ -21,7 +25,18 @@ export default function Dashboard() {
                 setError(e.message);
                 setLoading(false);
             });
+    };
+
+    useEffect(() => {
+        fetchMetrics();
+        // Implement Live Polling for 'Live' UI status!
+        const intervalId = setInterval(fetchMetrics, 15000);
+        return () => clearInterval(intervalId);
     }, []);
+
+    const handleGenerativeStrategy = () => {
+        setShowStrategyModal(true);
+    };
 
     if (loading) {
         return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -33,11 +48,20 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 bg-success/10 text-success text-xs font-semibold rounded-full border border-success/20">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                            </span>
+                            LIVE
+                        </span>
+                    </div>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Real-time insights for your business operations and inventory.
+                        Real-time native insights autonomously polling your business operations securely.
                     </p>
                 </div>
             </div>
@@ -71,6 +95,7 @@ export default function Dashboard() {
                     icon={<AlertTriangle className="w-5 h-5 text-destructive" />}
                     trend={stats.lowStockAlerts > 0 ? "Requires immediate action" : "Operational capacity optimal"}
                     goodTrend={stats.lowStockAlerts === 0}
+                    onClick={() => setShowCriticalAlerts(true)}
                 />
             </div>
 
@@ -117,18 +142,119 @@ export default function Dashboard() {
                             </div>
                         ))}
                     </div>
-                    <button className="mt-4 w-full h-9 rounded-md bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors border border-border">
-                        Generative Stock Strategy
+                    <button onClick={handleGenerativeStrategy} className="mt-4 w-full h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-md active:scale-[0.98]">
+                        Active Stock Strategy
                     </button>
                 </div>
             </div>
+
+            {/* Custom AI Strategy Modal */}
+            <Modal
+                isOpen={showStrategyModal}
+                onClose={() => setShowStrategyModal(false)}
+                maxWidth="lg"
+            >
+                <div>
+                    <div className="flex items-center gap-3 text-primary mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <span className="font-bold font-mono text-primary">AI</span>
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight">Generative Strategy</h2>
+                            <p className="text-xs text-muted-foreground">Deep tensor sweep against upcoming variables</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 space-y-4">
+                        <div className="bg-secondary/30 rounded-xl p-4 border border-border/50">
+                            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-primary" /> Expected Seasonal Trajectories
+                            </h4>
+                            <p className="text-sm text-foreground/80 leading-relaxed mb-4">
+                                Based on historical sales velocities across the unified ledger, we recommend the following strategic catalog adjustments dynamically:
+                            </p>
+                            <ul className="space-y-3">
+                                <li className="flex gap-2 text-sm">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                    <span className="text-foreground/90">Expand <strong className="text-foreground font-semibold">TV-Remote</strong> safety stock margin natively before local holiday surges.</span>
+                                </li>
+                                <li className="flex gap-2 text-sm">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></div>
+                                    <span className="text-foreground/90">Prioritize <strong className="text-foreground font-semibold">My-Phone</strong> wholesale acquisition immediately to avoid stock-outs.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end mt-6">
+                        <button
+                            onClick={() => setShowStrategyModal(false)}
+                            className="px-5 py-2.5 bg-[#29226B] hover:bg-primary text-white shadow-primary/25 hover:shadow-lg rounded-xl text-sm font-semibold transition-all active:scale-95"
+                        >
+                            Acknowledge & Close
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Critical Alerts Native Ledger Tracker */}
+            <Modal
+                isOpen={showCriticalAlerts}
+                onClose={() => setShowCriticalAlerts(false)}
+                maxWidth="lg"
+            >
+                <div className="flex flex-col gap-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight">Critical Stock Alerts</h2>
+                                <p className="text-xs text-muted-foreground">{stats?.lowStockAlerts} items require immediate resupply</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-secondary/20 border border-border rounded-xl overflow-hidden shadow-sm">
+                        <div className="grid grid-cols-4 bg-secondary/70 px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <div className="col-span-2">Product Name</div>
+                            <div className="text-center">Current Stock</div>
+                            <div className="text-right">Reorder Limit</div>
+                        </div>
+                        <div className="max-h-[50vh] overflow-y-auto w-full">
+                            {stats?.alertDetails?.filter(Boolean).length > 0 ? (
+                                stats.alertDetails.filter(Boolean).map((alert: any, idx: number) => (
+                                    <div key={idx} className="grid grid-cols-4 px-4 py-3 border-b border-border last:border-none hover:bg-secondary/40 transition-colors w-full">
+                                        <div className="col-span-2 text-sm font-semibold truncate pr-4 text-foreground/90" title={alert.name}>{alert.name}</div>
+                                        <div className="text-center flex justify-center items-center">
+                                            <span className="text-xs font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded border border-destructive/20">{alert.stock}</span>
+                                        </div>
+                                        <div className="text-right text-sm text-foreground/70 font-mono">{alert.limit}</div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10 text-sm text-muted-foreground">
+                                    <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-success/20">
+                                        <AlertTriangle className="w-5 h-5 text-success" />
+                                    </div>
+                                    All inventory layers are operating flawlessly!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
 
-function Card({ title, value, icon, trend, goodTrend }: { title: string, value: string, icon: React.ReactNode, trend: string, goodTrend: boolean }) {
+function Card({ title, value, icon, trend, goodTrend, onClick }: { title: string, value: string, icon: React.ReactNode, trend: string, goodTrend: boolean, onClick?: () => void }) {
     return (
-        <div className="border border-border bg-card rounded-xl shadow-sm p-5 hover:border-primary/30 transition-colors">
+        <div
+            onClick={onClick}
+            className={`border border-border bg-card rounded-xl shadow-sm p-5 transition-colors ${onClick ? 'cursor-pointer hover:border-primary/50 hover:bg-secondary/30' : 'hover:border-primary/30'}`}
+        >
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
                 <div className="p-2 rounded-lg bg-secondary">

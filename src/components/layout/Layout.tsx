@@ -7,7 +7,7 @@ export function Layout() {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
 
     return (
-        <div className="flex min-h-screen bg-background relative overflow-hidden">
+        <div className="flex h-screen w-full bg-background relative overflow-hidden">
             {/* Mobile overlay */}
             {isSidebarOpen && (
                 <div
@@ -17,13 +17,15 @@ export function Layout() {
             )}
 
             {/* Sidebar wrapper */}
-            <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out`}>
+            <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out print:hidden`}>
                 <Sidebar onClose={() => setSidebarOpen(false)} />
             </div>
 
-            <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
-                <Header onMenuClick={() => setSidebarOpen(true)} />
-                <main className="flex-1 p-3 md:p-6 overflow-y-auto">
+            <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden print:overflow-visible">
+                <div className="print:hidden">
+                    <Header onMenuClick={() => setSidebarOpen(true)} />
+                </div>
+                <main className="flex-1 p-3 md:p-6 overflow-y-auto print:p-0 print:overflow-visible print:bg-white">
                     <Outlet />
                 </main>
             </div>

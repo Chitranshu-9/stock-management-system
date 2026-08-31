@@ -11,7 +11,8 @@ import {
     PieChart,
     Settings as SettingsIcon,
     X,
-    LogOut
+    LogOut,
+    ReceiptText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ const navItems = [
     { icon: Scan, label: 'AI Single Scan', path: '/ai-tools' },
     { icon: ScanLine, label: 'Hardware Multi-Scan', path: '/hardware-scan' },
     { icon: ShoppingCart, label: 'GST Billing & POS', path: '/sales' },
+    { icon: ReceiptText, label: 'Invoices', path: '/sales/log' },
     { icon: ShoppingBag, label: 'Purchase Orders', path: '/purchases' },
     { icon: PieChart, label: 'Reports', path: '/reports' },
     { icon: SettingsIcon, label: 'Settings', path: '/settings' },

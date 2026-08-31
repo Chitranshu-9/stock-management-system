@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PackageSearch, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_ENDPOINTS } from '../../config/endpoints';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/auth/login', {
+            const res = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })

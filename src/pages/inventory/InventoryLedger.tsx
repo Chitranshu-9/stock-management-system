@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { API_ENDPOINTS } from '../../config/endpoints';
 
 interface StockMovement {
     _id: string;
@@ -19,7 +20,7 @@ export default function InventoryLedger() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetch('/api/inventory/ledger')
+        fetch(API_ENDPOINTS.INVENTORY.LEDGER)
             .then(res => {
                 if (!res.ok) throw new Error("Failed to authenticate Ledger access");
                 return res.json();

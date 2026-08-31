@@ -5,6 +5,7 @@ import path from 'path';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
 import StockMovement from '../models/StockMovement';
+import { PYTHON_ENDPOINTS } from '../config/endpoints';
 
 const router = Router();
 
@@ -48,8 +49,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
 
         res.status(201).json(product);
     } catch (e: any) {
-        console.error("Product Creation Fault:", e);
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: e.message || 'Creation error' });
     }
 });
 
@@ -64,7 +64,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             query.name = { $regex: new RegExp(search, 'i') };
         }
 
-        const products = await Product.find(query).limit(search ? 15 : 100).sort({ createdAt: -1 });
+        // Standard lightweight network query mapping
+        const products = await Product.find(query)
+            .limit(search ? 15 : 100)
+            .sort({ createdAt: -1 });
+
         res.status(200).json(products);
     } catch (e: any) {
         res.status(500).json({ error: e.message });
@@ -116,12 +120,15 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
                 performedBy: (req as any).user.email || 'AI'
             });
 
-        } else if (imagePath) {
-            if (!product.aiTrainingImages) {
-                product.aiTrainingImages = [];
+        } else {
+            if (imagePath) {
+                if (!product.aiTrainingImages) {
+                    product.aiTrainingImages = [];
+                }
+                product.aiTrainingImages.push(imagePath);
             }
-            product.aiTrainingImages.push(imagePath);
-            product.currentStock += finalQty; // Dynamic counting increment
+
+            product.currentStock += finalQty; // Dynamic counting increment independently of imagery
             await product.save();
 
             // Generate Native Ledger Adjustments
@@ -139,20 +146,26 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
         }
 
         if (imagePath) {
-            try {
-                await fetch('http://127.0.0.1:8002/api/v2/embeddings/enroll', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_path: imagePath, sku: product.sku, name: product.name, tenant_id: tenantId })
-                });
-            } catch (err: any) {
-                console.warn("Failed to instantly cache RAG Embedding:", err.message);
-            }
+            // Fire-and-Forget Asynchronous Execution!
+            // Do NOT 'await' this fetch. We want to instantly return a 201 to the React client 
+            // and let Node.js resolve the PyTorch RAG payload asynchronously in the background.
+            fetch(PYTHON_ENDPOINTS.EMBEDDINGS_ENROLL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_path: imagePath,
+                    sku: product.sku,
+                    name: product.name,
+                    product_id: product._id.toString(),
+                    tenant_id: tenantId
+                })
+            }).catch((err: any) => {
+                // Silently drop
+            });
         }
 
         res.status(201).json(product);
     } catch (e: any) {
-        console.error("AI Ingest Fault:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -160,23 +173,30 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
 // GET /api/products/bootstrap-ai
 router.get('/bootstrap-ai', async (req: Request, res: Response): Promise<void> => {
     try {
-        const products = await Product.find({ aiTrainingImages: { $exists: true, $not: { $size: 0 } } });
+        // Query products possessing Native Legacy Images, since ChromaDB stores all vectors persistently.
+        const products = await Product.find({
+            aiTrainingImages: { $exists: true, $not: { $size: 0 } }
+        });
+
         let count = 0;
+
         for (const p of products) {
-            if (p.aiTrainingImages && p.aiTrainingImages.length > 0) {
-                for (const img of p.aiTrainingImages) {
+            const hasLegacy = p.aiTrainingImages && p.aiTrainingImages.length > 0;
+
+            if (hasLegacy) {
+                for (const img of (p.aiTrainingImages || [])) {
                     try {
-                        await fetch('http://127.0.0.1:8002/api/v2/embeddings/enroll', {
+                        const enrollRes = await fetch(PYTHON_ENDPOINTS.EMBEDDINGS_ENROLL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image_path: img, sku: p.sku, name: p.name, tenant_id: p.tenantId })
+                            body: JSON.stringify({ image_path: img, sku: p.sku, name: p.name, product_id: p._id.toString(), tenant_id: p.tenantId })
                         });
-                        count++;
+                        if (enrollRes.ok) count++;
                     } catch (e) { }
                 }
             }
         }
-        res.status(200).json({ status: "Success", cached: count });
+        res.status(200).json({ status: "Success", cached: count, vector_db_mode: "ChromaDB" });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
     }
