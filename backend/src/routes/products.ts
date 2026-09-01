@@ -5,7 +5,7 @@ import path from 'path';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
 import StockMovement from '../models/StockMovement';
-import { PYTHON_ENDPOINTS } from '../config/endpoints';
+import { grpcEnrollEmbedding } from '../grpc-client';
 
 const router = Router();
 
@@ -146,20 +146,16 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
         }
 
         if (imagePath) {
-            // Fire-and-Forget Asynchronous Execution!
-            // Do NOT 'await' this fetch. We want to instantly return a 201 to the React client 
-            // and let Node.js resolve the PyTorch RAG payload asynchronously in the background.
-            fetch(PYTHON_ENDPOINTS.EMBEDDINGS_ENROLL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image_path: imagePath,
-                    sku: product.sku,
-                    name: product.name,
-                    product_id: product._id.toString(),
-                    tenant_id: tenantId
-                })
-            }).catch((err: any) => {
+            // Fire-and-Forget Asynchronous gRPC Execution!
+            // Do NOT 'await' this gRPC payload. Instantly return a 201 to the React client 
+            // and let Node.js resolve the PyTorch Protocol Buffer asynchronously in the background.
+            grpcEnrollEmbedding(
+                imagePath,
+                product.sku,
+                product.name,
+                product._id.toString(),
+                tenantId
+            ).catch((err: any) => {
                 // Silently drop
             });
         }
@@ -186,12 +182,14 @@ router.get('/bootstrap-ai', async (req: Request, res: Response): Promise<void> =
             if (hasLegacy) {
                 for (const img of (p.aiTrainingImages || [])) {
                     try {
-                        const enrollRes = await fetch(PYTHON_ENDPOINTS.EMBEDDINGS_ENROLL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image_path: img, sku: p.sku, name: p.name, product_id: p._id.toString(), tenant_id: p.tenantId })
-                        });
-                        if (enrollRes.ok) count++;
+                        const enrollRes = await grpcEnrollEmbedding(
+                            img,
+                            p.sku,
+                            p.name,
+                            p._id.toString(),
+                            p.tenantId
+                        );
+                        if (enrollRes && enrollRes.status === 'success') count++;
                     } catch (e) { }
                 }
             }

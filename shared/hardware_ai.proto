@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package hardware_ai;
+
+service HardwareAI {
+  rpc RecognizeJobs (RecognizeRequest) returns (RecognizeResponse) {}
+  rpc EnrollEmbedding (EnrollRequest) returns (EnrollResponse) {}
+}
+
+message RecognizeRequest {
+  bytes image_data = 1;
+  string tenant_id = 2;
+  string original_name = 3;
+}
+
+message BoundingBox {
+  float x1 = 1;
+  float y1 = 2;
+  float x2 = 3;
+  float y2 = 4;
+}
+
+message DetectedItem {
+  string sku = 1;
+  BoundingBox box = 2;
+  float confidence = 3;
+  string category = 4;
+}
+
+message RecognizeResponse {
+  string job_id = 1;
+  string status = 2;
+  int32 total_items = 3;
+  repeated DetectedItem items = 4;
+}
+
+message EnrollRequest {
+  string image_path = 1;
+  string sku = 2;
+  string name = 3;
+  string product_id = 4;
+  string tenant_id = 5;
+}
+
+message EnrollResponse {
+  string status = 1;
+  string message = 2;
+}

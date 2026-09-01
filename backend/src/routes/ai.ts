@@ -2,9 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
-import FormData from 'form-data';
-import { PYTHON_ENDPOINTS } from '../config/endpoints';
-// import { z } from 'zod'; // Useful for strict parsing later
+import { grpcRecognizeJobs } from '../grpc-client';
 
 const router = Router();
 
@@ -64,32 +62,18 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
             return;
         }
 
-        // Hardcoded Native Python Host Binding
-        const LOCAL_PYTHON_ENDPOINT = PYTHON_ENDPOINTS.RECOGNITION_JOBS;
+        // Hardcoded Native Python Host Binding (gRPC) skipped. Extracted globally in grpc-client.
 
         let aiJsonResult = null;
 
         console.log(`\n\n=== [AI PIPELINE TRACE] NEW INGESTION ===`);
         console.log(`[1] File Extracted from Payload: ${req.file.originalname} | Size: ${req.file.buffer.length} bytes`);
 
-        // Native FormData construction inside Node.js
-        const formData = new FormData();
-        const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
-        formData.append('image', blob, req.file.originalname || 'upload.jpg');
-
         try {
-            console.log(`[2] Establishing TCP Socket to Native Python Backend Engine...`);
-            const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
-                method: 'POST',
-                body: formData as any
-            }, 240000); // 240s explicit timeout limit supporting high resolution uncompressed offline pictures
+            console.log(`[2] Establishing TCP Socket to Native Python Backend Engine (gRPC)...`);
+            const response = await grpcRecognizeJobs(req.file.buffer, (req as any).user.tenantId, req.file.originalname);
 
-            if (!response.ok) {
-                const errorStr = await response.text();
-                throw new Error(`Python Bridge Fault: ${errorStr}`);
-            }
-
-            aiJsonResult = await response.json();
+            aiJsonResult = response;
             console.log(`[3] Valid AI JSON returned successfully:`, JSON.stringify(aiJsonResult, null, 2));
 
         } catch (bridgeErr: any) {
@@ -152,27 +136,14 @@ router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: N
 
         console.log(`\n\n[POS TRACE] Native API Ingestion: ${req.file.originalname} | Size: ${req.file.size || req.file.buffer.length}`);
 
-        const LOCAL_PYTHON_ENDPOINT = PYTHON_ENDPOINTS.RECOGNITION_JOBS;
-        const formData = new FormData();
+        const response = await grpcRecognizeJobs(
+            req.file.buffer,
+            (req as any).user.tenantId,
+            req.file.originalname || 'upload.jpg'
+        );
 
-        // Use third-party FormData mapping raw MultiPart boundary payload seamlessly bypassing native 'undici'
-        formData.append('file', req.file.buffer, { filename: req.file.originalname || 'upload.jpg', contentType: req.file.mimetype });
-        formData.append('tenant_id', (req as any).user.tenantId);
-
-        const response = await fetchWithAI(LOCAL_PYTHON_ENDPOINT, {
-            method: 'POST',
-            body: formData.getBuffer() as any,
-            headers: formData.getHeaders()
-        }, 240000);
-
-        if (!response.ok) {
-            const txt = await response.text();
-            console.error("[POS TRACE] Python Bridge Error:", txt);
-            throw new Error(`YOLO Python Bridge Fault: ${txt}`);
-        }
-
-        const jsonResult = await response.json();
-        console.log("[POS TRACE] Python Original JSON Return:");
+        const jsonResult = response;
+        console.log("[POS TRACE] Python gRPC Original JSON Return:");
         console.log(JSON.stringify(jsonResult, null, 2));
 
         // ------------------------------------------------------------------
