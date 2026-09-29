@@ -137,11 +137,22 @@ router.get('/overview', requireAuth, requireRole('admin', 'manager'), async (req
 router.post('/checkout', requireAuth, async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user?.tenantId;
-        const { items, customerName, customerPhone, customerGstin } = req.body;
+        const { items, customerName, customerPhone, customerGstin, idempotencyKey } = req.body;
 
         if (!items || items.length === 0) {
             res.status(400).json({ error: 'Cart is empty' });
             return;
+        }
+
+        // --- IDEMPOTENCY QUEUE GUARD ---
+        if (idempotencyKey) {
+            const existingInvoice = await Invoice.findOne({ tenantId, "customerDetails.gstin": idempotencyKey }); // Temporary mapping, will update Invoice properly next. Better to just check if StockMovement with this idempotencyKey exists!
+            const existingMovement = await StockMovement.findOne({ tenantId, idempotencyKey });
+
+            if (existingMovement) {
+                res.status(200).json({ message: 'Idempotent Playback Rejected Natively', status: 'ALREADY_APPLIED' });
+                return;
+            }
         }
 
         // We will execute deductions sequentially to ensure validity. 
@@ -194,19 +205,33 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response): Promi
             }))
         });
 
-        // Phase 3: Execute Vulnerable Stock Deductions
+        // Phase 3: Execute Strict Condition-Bounded Stock Deductions (Zero-Trust Concurrency)
         for (const { product, qty, name } of validArtifacts) {
-            product.currentStock = product.currentStock - qty;
-            await product.save();
+            // Structurally bounding the update utilizing $inc to prevent overlapping concurrent checkout reads natively
+            const updatedProduct = await Product.findOneAndUpdate(
+                {
+                    _id: product._id,
+                    tenantId,
+                    currentStock: { $gte: qty } // Explicit native bounding mathematically preventing negative overlays
+                },
+                { $inc: { currentStock: -qty } },
+                { new: true }
+            );
+
+            if (!updatedProduct) {
+                // Throw safety rollback warning natively preventing subsequent mutations
+                throw new Error(`CRITICAL_CONCURRENCY_ABORT: Product ${name} stock fell below sequential request bounds during transaction.`);
+            }
 
             await StockMovement.create({
                 tenantId,
-                productId: product._id,
-                productName: product.name,
+                productId: updatedProduct._id,
+                productName: updatedProduct.name,
                 type: 'Sale',
+                idempotencyKey: idempotencyKey ? `${idempotencyKey}-${updatedProduct._id}` : undefined,
                 quantityOut: qty,
                 quantityIn: 0,
-                balanceAfter: product.currentStock,
+                balanceAfter: updatedProduct.currentStock,
                 referenceId: invoiceNumber,
                 performedBy: (req as any).user?.userId || tenantId,
                 notes: `POS Checkout (${customerName || 'Walk-in'})`
@@ -243,6 +268,103 @@ router.get('/invoices', requireAuth, async (req: Request, res: Response): Promis
             .limit(100);
         res.status(200).json(invoices);
     } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// GET /api/inventory/low-stock
+// Explicitly isolated low-stock reporting route.
+router.get('/low-stock', requireAuth, requireRole('admin', 'manager'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const tenantId = (req as any).user.tenantId;
+
+        const lowStockItems = await Product.aggregate([
+            { $match: { tenantId } },
+            { $match: { $expr: { $lte: ["$currentStock", { $ifNull: ["$reorderLevel", 10] }] } } },
+            { $project: { name: 1, sku: 1, currentStock: 1, reorderLevel: { $ifNull: ["$reorderLevel", 10] } } }
+        ]);
+
+        res.status(200).json(lowStockItems);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/inventory/adjust
+// Perform explicit Physical Inventory Reconciliation (Count -> Variance -> Adjustment)
+router.post('/adjust', requireAuth, requireRole('admin', 'manager'), async (req: Request, res: Response): Promise<void> => {
+    try {
+        const tenantId = (req as any).user.tenantId;
+        const { productId, physicalCount, reason, notes, idempotencyKey } = req.body;
+
+        if (!productId || physicalCount === undefined || isNaN(physicalCount)) {
+            res.status(400).json({ error: 'Valid productId and mathematical physicalCount is absolutely required' });
+            return;
+        }
+
+        // Idempotency Queue Guard
+        if (idempotencyKey) {
+            const existingMovement = await StockMovement.findOne({ tenantId, idempotencyKey });
+            if (existingMovement) {
+                res.status(200).json({ message: 'Idempotent Playback Rejected Natively', status: 'ALREADY_APPLIED', variance: 0 });
+                return;
+            }
+        }
+
+        // Native variance detection bounds
+        const product = await Product.findOne({ _id: productId, tenantId });
+        if (!product) {
+            res.status(404).json({ error: 'Product not found within this Tenant enclave' });
+            return;
+        }
+
+        const variance = Number(physicalCount) - product.currentStock;
+
+        if (variance === 0) {
+            // No structural change required, still valid reconciliation!
+            res.status(200).json({ message: 'Reconciliation successful. No variance detected.', variance: 0, currentStock: product.currentStock });
+            return;
+        }
+
+        // Apply Native Atomic Mutation
+        const updatedProduct = await Product.findOneAndUpdate(
+            { _id: product._id, tenantId },
+            { $inc: { currentStock: variance } },
+            { new: true }
+        );
+
+        if (!updatedProduct) {
+            res.status(500).json({ error: 'CRITICAL: Concurrent race-condition rollback triggered seamlessly' });
+            return;
+        }
+
+        // Emit Accounting Artifact
+        const finalType = reason === 'Damage' ? 'Damage' :
+            reason === 'Wastage' ? 'Wastage' :
+                reason === 'Found' ? 'Opening_Stock' : 'Adjustment';
+
+        const movement = await StockMovement.create({
+            tenantId,
+            productId: updatedProduct._id,
+            productName: updatedProduct.name,
+            type: finalType,
+            idempotencyKey,
+            quantityIn: variance > 0 ? variance : 0,
+            quantityOut: variance < 0 ? Math.abs(variance) : 0,
+            balanceAfter: updatedProduct.currentStock,
+            referenceId: `ADJ-${Date.now()}`,
+            performedBy: (req as any).user.userId || tenantId,
+            notes: notes || `Physical Count Reconciliation (Variance: ${variance})`
+        });
+
+        res.status(200).json({
+            message: 'Adjustment applied cleanly',
+            variance,
+            balanceAfter: updatedProduct.currentStock,
+            movementId: movement._id
+        });
+
+    } catch (e: any) {
+        console.error("Adjustment Error:", e);
         res.status(500).json({ error: e.message });
     }
 });

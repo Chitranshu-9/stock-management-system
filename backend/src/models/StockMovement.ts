@@ -4,8 +4,9 @@ export interface IStockMovement extends Document {
     tenantId: string;
     productId: mongoose.Types.ObjectId;
     productName: string; // denormalization for fast ledger queries
-    type: 'Purchase' | 'Sale' | 'Adjustment' | 'Transfer';
+    type: 'Purchase' | 'Sale' | 'Adjustment' | 'Transfer' | 'Wastage' | 'Damage' | 'Return' | 'Opening_Stock';
     referenceId: string; // e.g. Invoice Number, PO Number, or System Override ID
+    idempotencyKey?: string;
     quantityIn: number;
     quantityOut: number;
     balanceAfter: number; // Snapshot of the stock at this exact moment
@@ -19,8 +20,9 @@ const StockMovementSchema = new Schema<IStockMovement>({
     tenantId: { type: String, required: true, index: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     productName: { type: String, required: true },
-    type: { type: String, enum: ['Purchase', 'Sale', 'Adjustment', 'Transfer'], required: true },
+    type: { type: String, enum: ['Purchase', 'Sale', 'Adjustment', 'Transfer', 'Wastage', 'Damage', 'Return', 'Opening_Stock'], required: true },
     referenceId: { type: String, required: true },
+    idempotencyKey: { type: String, index: true },
     quantityIn: { type: Number, default: 0 },
     quantityOut: { type: Number, default: 0 },
     balanceAfter: { type: Number, required: true },

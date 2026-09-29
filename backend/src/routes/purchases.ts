@@ -131,12 +131,24 @@ router.post('/:id/receive', requireAuth, requireRole('admin', 'manager'), async 
     try {
         const tenantId = (req as any).user.tenantId;
         const poId = req.params.id;
-        const { receivingItems, notes } = req.body;
+        const { receivingItems, notes, idempotencyKey } = req.body;
         // receivingItems: [{ productId, qtyToReceive }]
 
         if (!receivingItems || !Array.isArray(receivingItems)) {
             res.status(400).json({ error: 'Valid payload structure describing {productId, qtyToReceive} limits required.' });
             return;
+        }
+
+        // Idempotency Queue Guard
+        if (idempotencyKey) {
+            const existingReceipt = await PurchaseReceipt.findOne({ tenantId, "notes": idempotencyKey }); // Basic workaround leveraging notes as idempotency marker for receipts unless injected into receipt model explicitly. Let's just block on the ledger natively:
+            const existingLedger = await StockMovement.findOne({ tenantId, idempotencyKey });
+            if (existingLedger) {
+                await session.abortTransaction();
+                session.endSession();
+                res.status(200).json({ message: 'Idempotent Playback Rejected', status: 'ALREADY_APPLIED' });
+                return;
+            }
         }
 
         const po = await PurchaseOrder.findOne({ _id: poId, tenantId }).session(session);
@@ -180,20 +192,23 @@ router.post('/:id/receive', requireAuth, requireRole('admin', 'manager'), async 
             });
 
             // >>> NATIVE STOCK MOVEMENT DRIFT ENFORCIBILITY <<<
-            const internalCoreProduct = await Product.findOne({ _id: itemBoundary.productId }).session(session);
-            if (internalCoreProduct) {
-                internalCoreProduct.currentStock += incomingQty;
-                await internalCoreProduct.save({ session }); // Crucial sequential persistence
+            const updatedProduct = await Product.findOneAndUpdate(
+                { _id: itemBoundary.productId, tenantId },
+                { $inc: { currentStock: incomingQty } },
+                { new: true, session }
+            );
 
+            if (updatedProduct) {
                 // Generate strictly integrated Audit Trail tracking precisely to original systems 
                 await StockMovement.create([{
                     tenantId,
-                    productId: internalCoreProduct._id,
-                    productName: internalCoreProduct.name,
+                    productId: updatedProduct._id,
+                    productName: updatedProduct.name,
                     type: 'Purchase',
+                    idempotencyKey: idempotencyKey ? `${idempotencyKey}-${updatedProduct._id}` : undefined,
                     quantityIn: incomingQty,
                     quantityOut: 0,
-                    balanceAfter: internalCoreProduct.currentStock,
+                    balanceAfter: updatedProduct.currentStock,
                     referenceId: receiptNumber, // Points strictly to the granular receipt block!
                     performedBy: (req as any).user.userId,
                     notes: notes || `Inbound PO Receipt execution bounds mapping: ${po.poNumber}`

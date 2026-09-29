@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Plus, FileDown, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Search, Filter, Plus, FileDown, MoreHorizontal, Loader2, PenTool } from 'lucide-react';
+import ReconciliationModal from '../../components/inventory/ReconciliationModal';
 
 interface Product {
     _id: string;
@@ -16,6 +17,7 @@ export default function ProductList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
+    const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -134,7 +136,13 @@ export default function ProductList() {
                                                 {getStatus(product.currentStock).text}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => setAdjustingProduct(product)}
+                                                className="flex items-center gap-1 text-xs font-medium border border-input bg-background hover:bg-secondary px-2 py-1.5 rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                                            >
+                                                <PenTool className="w-3 h-3" /> Adjust
+                                            </button>
                                             <button className="text-muted-foreground hover:text-foreground p-1 transition-colors">
                                                 <MoreHorizontal className="w-4 h-4" />
                                             </button>
@@ -158,6 +166,18 @@ export default function ProductList() {
                     </div>
                 </div>
             </div>
+
+            {adjustingProduct && (
+                <ReconciliationModal
+                    product={adjustingProduct}
+                    onClose={() => setAdjustingProduct(null)}
+                    onSuccess={() => {
+                        setAdjustingProduct(null);
+                        // Refresh active product list strictly to reflect the adjustment seamlessly
+                        setSearch(search + ' '); setTimeout(() => setSearch(search), 50);
+                    }}
+                />
+            )}
         </div>
     );
 }

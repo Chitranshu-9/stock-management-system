@@ -16,7 +16,9 @@ export const API_ENDPOINTS = {
         LEDGER: '/api/inventory/ledger',
         OVERVIEW: '/api/inventory/overview',
         INVOICES: '/api/inventory/invoices',
-        CHECKOUT: '/api/inventory/checkout'
+        CHECKOUT: '/api/inventory/checkout',
+        ADJUST: '/api/inventory/adjust',
+        LOW_STOCK: '/api/inventory/low-stock'
     },
     AUTH: {
         LOGIN: '/api/auth/login',

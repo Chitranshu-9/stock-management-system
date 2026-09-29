@@ -42,6 +42,10 @@ export default function InventoryLedger() {
             case 'Sale': return <ArrowUpRight className="w-4 h-4 text-destructive" />;
             case 'Purchase': return <ArrowDownLeft className="w-4 h-4 text-success" />;
             case 'Adjustment': return <ArrowRightLeft className="w-4 h-4 text-orange-500" />;
+            case 'Transfer': return <ArrowRightLeft className="w-4 h-4 text-blue-500" />;
+            case 'Damage': return <ArrowUpRight className="w-4 h-4 text-red-700" />;
+            case 'Wastage': return <ArrowUpRight className="w-4 h-4 text-orange-700" />;
+            case 'Opening_Stock': return <ArrowDownLeft className="w-4 h-4 text-emerald-600" />;
             default: return <ArrowRightLeft className="w-4 h-4 text-blue-500" />;
         }
     };
@@ -85,6 +89,9 @@ export default function InventoryLedger() {
                         <option value="Purchase">Purchase</option>
                         <option value="Adjustment">Adjustment</option>
                         <option value="Transfer">Transfer</option>
+                        <option value="Damage">Damage</option>
+                        <option value="Wastage">Wastage</option>
+                        <option value="Opening_Stock">Opening Stock</option>
                     </select>
                 </div>
 
