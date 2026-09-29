@@ -162,7 +162,7 @@ class HardwareAIService(hardware_ai_pb2_grpc.HardwareAIServicer):
                     item_cat = "Unknown Object"
                     item_conf = conf
                     
-                    if rag_match and best_score >= 0.85:
+                    if rag_match and best_score >= 0.65:
                         item_cat = rag_match['name']
                         item_sku = rag_match['sku']
                         item_conf = float(best_score)

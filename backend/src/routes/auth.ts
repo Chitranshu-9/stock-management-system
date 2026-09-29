@@ -164,4 +164,20 @@ router.post('/logout', (req: Request, res: Response) => {
     res.json({ message: 'Logged out successfully' });
 });
 
+// GET /api/auth/verify
+router.get('/verify', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const token = req.cookies?.accessToken;
+        if (!token) {
+            res.status(401).json({ error: 'No session' });
+            return;
+        }
+        const secret = process.env.JWT_SECRET || 'fallback-secret-development';
+        const decoded = jwt.verify(token, secret) as { userId: string; tenantId: string; role: string };
+        res.json({ userId: decoded.userId, tenantId: decoded.tenantId, role: decoded.role });
+    } catch {
+        res.status(401).json({ error: 'Invalid or expired session' });
+    }
+});
+
 export default router;

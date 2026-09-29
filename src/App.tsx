@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NetworkQueueProvider } from "./contexts/NetworkQueueContext";
 import { Layout } from './components/layout/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -22,18 +23,20 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="inventory" element={<ProductList />} />
-            <Route path="inventory/ledger" element={<InventoryLedger />} />
-            <Route path="purchases" element={<PurchaseOrders />} />
-            <Route path="ai-tools" element={<AITools />} />
-            <Route path="hardware-scan" element={<HardwareScanner />} />
-            <Route path="sales" element={<POS />} />
-            <Route path="sales/invoice" element={<Invoice />} />
-            <Route path="sales/log" element={<SalesLog />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="settings" element={<Settings />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="inventory" element={<ProductList />} />
+              <Route path="inventory/ledger" element={<InventoryLedger />} />
+              <Route path="purchases" element={<PurchaseOrders />} />
+              <Route path="ai-tools" element={<AITools />} />
+              <Route path="hardware-scan" element={<HardwareScanner />} />
+              <Route path="sales" element={<POS />} />
+              <Route path="sales/invoice" element={<Invoice />} />
+              <Route path="sales/log" element={<SalesLog />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

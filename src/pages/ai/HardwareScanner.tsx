@@ -240,13 +240,13 @@ export default function HardwareScanner() {
         <div className="space-y-6 max-w-5xl mx-auto">
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Hardware Bounding Box Tracker</h1>
-                <p className="text-muted-foreground text-sm mt-1">Multi-object bounding detection leveraging local YOLOv8 extraction.</p>
+                <p className="text-muted-foreground text-sm mt-1">Multi-object bounding detection leveraging local AI extraction.</p>
                 <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-md flex items-start gap-3">
                     <span className="text-xl">💡</span>
                     <div>
                         <p className="text-sm font-semibold text-primary">Operator Scanning Tip</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            FastSAM relies on screen proportion. For <strong>micro-objects</strong> like single screws or small drill-bits, bring the camera closer so the item fills at least <strong className="text-primary/80">15-20%</strong> of the screen to prevent it from being filtered out as background noise.
+                            The AI relies on screen proportion. For <strong>micro-objects</strong> like single screws or small drill-bits, bring the camera closer so the item fills at least <strong className="text-primary/80">15-20%</strong> of the screen to prevent it from being filtered out as background noise.
                         </p>
                     </div>
                 </div>

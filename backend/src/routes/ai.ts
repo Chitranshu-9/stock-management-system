@@ -147,20 +147,36 @@ router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: N
         console.log(JSON.stringify(jsonResult, null, 2));
 
         // ------------------------------------------------------------------
+        // Shape normalisation: gRPC returns box:{x1,y1,x2,y2} but the
+        // frontend HardwareScanner expects bbox:[x1,y1,x2,y2] + detection_id
+        // ------------------------------------------------------------------
+        const normalizedItems = (jsonResult.items || []).map((item: any, idx: number) => {
+            const b = item.box || {};
+            return {
+                detection_id: `det_${jsonResult.job_id}_${idx}`,
+                sku: item.sku || '',
+                category: item.category || 'Unknown',
+                confidence: item.confidence ?? 0,
+                bbox: [b.x1 ?? 0, b.y1 ?? 0, b.x2 ?? 0, b.y2 ?? 0]
+            };
+        });
+
+        // ------------------------------------------------------------------
         // INVERSION COMPLIANCE: Hydrate Native Geometry with Business Ledger
         // ------------------------------------------------------------------
-        const skus = (jsonResult.items || []).map((i: any) => i.sku).filter(Boolean);
+        const skus = normalizedItems.map((i: any) => i.sku).filter(Boolean);
         console.log(`[POS TRACE] Extracted ChromDB SKUs:`, skus);
 
         const catalogMatches = skus.length > 0
             ? await Product.find({ sku: { $in: skus }, tenantId: (req as any).user.tenantId })
             : [];
 
-        console.log(`[POS TRACE] Retrieved MongoDB Overlaps:`, catalogMatches.map(c => c.sku));
+        console.log(`[POS TRACE] Retrieved MongoDB Overlaps:`, catalogMatches.map((c: any) => c.sku));
 
         // Return perfectly merged geometrical bounding mapping combined seamlessly with DB Ledgers
         res.status(200).json({
             ...jsonResult,
+            items: normalizedItems,
             catalogMatches
         });
     } catch (e: any) {
