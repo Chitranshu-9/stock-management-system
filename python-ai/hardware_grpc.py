@@ -51,7 +51,7 @@ def apply_fastsam_mask(image_pil: Image.Image):
                 m = results[0].masks.data[idx].cpu().numpy()
                 area = m.sum()
                 area_ratio = area / total_pixels
-                if area_ratio < 0.02 or area_ratio > 0.98: continue  
+                if area_ratio < 0.01 or area_ratio > 0.99: continue  
                 if area > largest_area:
                     largest_area, best_mask = area, m
             if best_mask is not None:
@@ -129,7 +129,7 @@ class HardwareAIService(hardware_ai_pb2_grpc.HardwareAIServicer):
                     x1, y1, x2, y2 = b
                     box_area = (x2 - x1) * (y2 - y1)
                     
-                    if box_area / (image.width * image.height) < 0.02 or box_area / (image.width * image.height) > 0.85:
+                    if box_area / (image.width * image.height) < 0.01 or box_area / (image.width * image.height) > 0.99:
                         continue
                         
                     padding = 10
@@ -162,7 +162,7 @@ class HardwareAIService(hardware_ai_pb2_grpc.HardwareAIServicer):
                     item_cat = "Unknown Object"
                     item_conf = conf
                     
-                    if rag_match and best_score >= 0.65:
+                    if rag_match and best_score >= 0.85:
                         item_cat = rag_match['name']
                         item_sku = rag_match['sku']
                         item_conf = float(best_score)

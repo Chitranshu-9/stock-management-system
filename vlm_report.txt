@@ -1,0 +1,6 @@
+
+--- Results for unseen image: mug.jpg ---
+[AI VLM MATCH] Category: 'Unclassifiable Shape' | Conf: 0.890
+[AI VLM MATCH] Category: 'Unclassifiable Shape' | Conf: 0.652
+[AI VLM MATCH] Category: 'Unclassifiable Shape' | Conf: 0.434
+[AI VLM MATCH] Category: 'Unclassifiable Shape' | Conf: 0.051

@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
-import { grpcRecognizeJobs } from '../grpc-client';
+import { ServiceRegistry } from '../registry/ServiceRegistry';
 
 const router = Router();
 
@@ -64,16 +64,32 @@ router.post('/scan', requireAuth, (req: Request, res: Response, next: NextFuncti
 
         // Hardcoded Native Python Host Binding (gRPC) skipped. Extracted globally in grpc-client.
 
-        let aiJsonResult = null;
+        let aiJsonResult: any = null;
 
         console.log(`\n\n=== [AI PIPELINE TRACE] NEW INGESTION ===`);
         console.log(`[1] File Extracted from Payload: ${req.file.originalname} | Size: ${req.file.buffer.length} bytes`);
 
         try {
-            console.log(`[2] Establishing TCP Socket to Native Python Backend Engine (gRPC)...`);
-            const response = await grpcRecognizeJobs(req.file.buffer, (req as any).user.tenantId, req.file.originalname);
+            console.log(`[2] Establishing TCP Socket to External Service Registry...`);
+            const scannerService = ServiceRegistry.getInstance().get('ai-scanner');
+            const response = await scannerService.request('scan', {
+                imageData: req.file.buffer,
+                tenantId: (req as any).user.tenantId,
+                originalName: req.file.originalname
+            });
 
-            aiJsonResult = response;
+            if (response && (response as any).items && (response as any).items.length > 0) {
+                // Safely translate the gRPC bounding-box array into the legacy Single-Product format
+                const primaryDetection = (response as any).items[0];
+                aiJsonResult = {
+                    productName: primaryDetection.category || 'Unknown',
+                    confidence: primaryDetection.confidence || 1.0,
+                    attributes: {}
+                };
+            } else {
+                throw new Error("No distinct physical primitive extracted from image.");
+            }
+
             console.log(`[3] Valid AI JSON returned successfully:`, JSON.stringify(aiJsonResult, null, 2));
 
         } catch (bridgeErr: any) {
@@ -134,21 +150,28 @@ router.post('/hardware-scan', requireAuth, (req: Request, res: Response, next: N
             return;
         }
 
-        console.log(`\n\n[POS TRACE] Native API Ingestion: ${req.file.originalname} | Size: ${req.file.size || req.file.buffer.length}`);
+        // Replace direct coupling with Dynamic Service Discovery
+        const scannerService = ServiceRegistry.getInstance().get('ai-scanner');
 
-        const response = await grpcRecognizeJobs(
-            req.file.buffer,
-            (req as any).user.tenantId,
-            req.file.originalname || 'upload.jpg'
-        );
+        let response: any;
+        try {
+            response = await scannerService.request('scan', {
+                imageData: req.file.buffer,
+                tenantId: (req as any).user.tenantId,
+                originalName: req.file.originalname || 'upload.jpg'
+            });
+        } catch (svcError: any) {
+            console.error('[Service Isolation Error]', svcError);
+            res.status(503).json({ error: 'AI Scanner Service is currently unavailable or returning errors.', details: svcError.message });
+            return;
+        }
 
         const jsonResult = response;
-        console.log("[POS TRACE] Python gRPC Original JSON Return:");
+        console.log("[POS TRACE] Dynamic Service JSON Return:");
         console.log(JSON.stringify(jsonResult, null, 2));
 
         // ------------------------------------------------------------------
-        // Shape normalisation: gRPC returns box:{x1,y1,x2,y2} but the
-        // frontend HardwareScanner expects bbox:[x1,y1,x2,y2] + detection_id
+        // Shape normalisation: Service payload standard output
         // ------------------------------------------------------------------
         const normalizedItems = (jsonResult.items || []).map((item: any, idx: number) => {
             const b = item.box || {};

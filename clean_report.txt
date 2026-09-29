@@ -1,0 +1,22 @@
+[*] Enrolling Logitech Mouse (SKU-MOUSE-1) from ../mouse.jpeg...
+[*] Enrolling Vega Helmet (SKU-HELMET-1) from ../helmet.jpeg...
+
+=======================================
+          RUNNING TEST SUITE           
+=======================================
+
+[+] Mouse (Original): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.940
+[+] Mouse (Original): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.943
+[+] Helmet (Original): SUCCESS -> SKU: SKU-HELMET-1 (Vega Helmet) | Conf: 0.952
+[+] Mouse (Rotated 90): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.927
+[!] Mouse (Rotated 90): REJECTED (Classified as Unknown. Expected matching: SKU-MOUSE-1) -> SKU:  (Unclassifiable Shape) | Conf: 0.108
+[!] Mouse (Rotated 90): REJECTED (Classified as Unknown. Expected matching: SKU-MOUSE-1) -> SKU:  (Unclassifiable Shape) | Conf: 0.093
+[!] Mouse (Rotated 90): REJECTED (Classified as Unknown. Expected matching: SKU-MOUSE-1) -> SKU:  (Unclassifiable Shape) | Conf: 0.060
+[+] Helmet (Rotated 270): SUCCESS -> SKU: SKU-HELMET-1 (Vega Helmet) | Conf: 0.914
+[+] Mouse (Super Saturated): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.915
+[+] Mouse (Super Saturated): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.904
+[+] Mouse (Super Saturated): SUCCESS -> SKU: SKU-MOUSE-1 (Logitech Mouse) | Conf: 0.903
+[+] Helmet (Black and White): SUCCESS -> SKU: SKU-HELMET-1 (Vega Helmet) | Conf: 0.860
+[+] Helmet (Darkened 60%): SUCCESS -> SKU: SKU-HELMET-1 (Vega Helmet) | Conf: 0.944
+
+DONE.

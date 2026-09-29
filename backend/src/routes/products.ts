@@ -5,7 +5,7 @@ import path from 'path';
 import { requireAuth } from '../middleware/auth';
 import Product from '../models/Product';
 import StockMovement from '../models/StockMovement';
-import { grpcEnrollEmbedding } from '../grpc-client';
+import { ServiceRegistry } from '../registry/ServiceRegistry';
 
 const router = Router();
 
@@ -146,19 +146,24 @@ router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Reque
         }
 
         if (imagePath) {
-            // Fire-and-Forget Asynchronous gRPC Execution!
-            // Do NOT 'await' this gRPC payload. Instantly return a 201 to the React client 
-            // and let Node.js resolve the PyTorch Protocol Buffer asynchronously in the background.
-            grpcEnrollEmbedding(
-                imagePath,
-                product.sku,
-                product.name,
-                product._id.toString(),
-                tenantId
-            ).catch((err: any) => {
-                // Silently drop
-            });
+            try {
+                if (ServiceRegistry.getInstance().isEnabled('ai-scanner')) {
+                    const scannerService = ServiceRegistry.getInstance().get('ai-scanner');
+                    scannerService.request('enroll', {
+                        imagePath: imagePath,
+                        sku: product.sku,
+                        name: product.name,
+                        productId: product._id.toString(),
+                        tenantId: tenantId
+                    }).catch(err => {
+                        console.error('Non-critical async background embedding generation isolated exception:', err.message);
+                    });
+                }
+            } catch (e: any) {
+                console.warn(`[Pluggable Isolation Warning] AI Service Enrollment bypassed: ${e.message}`);
+            }
         }
+
 
         res.status(201).json(product);
     } catch (e: any) {
@@ -182,14 +187,17 @@ router.get('/bootstrap-ai', async (req: Request, res: Response): Promise<void> =
             if (hasLegacy) {
                 for (const img of (p.aiTrainingImages || [])) {
                     try {
-                        const enrollRes = await grpcEnrollEmbedding(
-                            img,
-                            p.sku,
-                            p.name,
-                            p._id.toString(),
-                            p.tenantId
-                        );
-                        if (enrollRes && enrollRes.status === 'success') count++;
+                        if (ServiceRegistry.getInstance().isEnabled('ai-scanner')) {
+                            const scannerService = ServiceRegistry.getInstance().get('ai-scanner');
+                            const enrollRes: any = await scannerService.request('enroll', {
+                                imagePath: img,
+                                sku: p.sku,
+                                name: p.name,
+                                productId: p._id.toString(),
+                                tenantId: p.tenantId
+                            });
+                            if (enrollRes && enrollRes.status === 'success') count++;
+                        }
                     } catch (e) { }
                 }
             }

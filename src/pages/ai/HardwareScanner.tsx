@@ -473,8 +473,12 @@ export default function HardwareScanner() {
                                                     </div>
                                                 ) : (
                                                     <div className="group cursor-text" onClick={() => { setEditModeId(item.detection_id); setEditValue(item.category); setSuggestions([]); }}>
-                                                        <h3 className="font-medium text-foreground capitalize group-hover:text-primary transition-colors inline-block border-b border-transparent group-hover:border-primary/50 border-dashed pb-0.5">{item.category}</h3>
-                                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">✏️ Edit Model Label</span>
+                                                        <h3 className={`font-medium capitalize transition-colors inline-block border-b border-transparent border-dashed pb-0.5 ${!item.sku ? 'text-destructive group-hover:border-destructive/50' : 'text-foreground group-hover:text-primary group-hover:border-primary/50'}`}>
+                                                            {!item.sku ? '⚠️ Unknown Object - Please Label' : item.category}
+                                                        </h3>
+                                                        <span className={`opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${!item.sku ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                                                            ✏️ {item.sku ? 'Edit Model Label' : 'Click to Set Label'}
+                                                        </span>
                                                         <p className="text-xs text-muted-foreground font-mono mt-1">UUID: {item.detection_id} {item.sku && <span className="text-success font-medium ml-1">| Match: {item.sku}</span>}</p>
                                                     </div>
                                                 )}
