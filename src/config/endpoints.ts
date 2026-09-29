@@ -23,5 +23,11 @@ export const API_ENDPOINTS = {
         VERIFY: '/api/auth/verify',
         SIGNUP: '/api/auth/signup',
         LOGOUT: '/api/auth/logout'
+    },
+    SUPPLIERS: {
+        BASE: '/api/suppliers'
+    },
+    PURCHASES: {
+        BASE: '/api/purchases'
     }
 };

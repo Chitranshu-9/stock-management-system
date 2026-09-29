@@ -5,6 +5,8 @@ import authRoutes from './routes/auth';
 import aiRoutes from './routes/ai';
 import productRoutes from './routes/products';
 import inventoryRoutes from './routes/inventory';
+import supplierRoutes from './routes/suppliers';
+import purchaseRoutes from './routes/purchases';
 
 const app = express();
 
@@ -27,5 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchases', purchaseRoutes);
 
 export default app;

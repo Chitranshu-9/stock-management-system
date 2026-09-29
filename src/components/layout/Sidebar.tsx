@@ -12,7 +12,8 @@ import {
     Settings as SettingsIcon,
     X,
     LogOut,
-    ReceiptText
+    ReceiptText,
+    Truck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ const navItems = [
     { icon: ShoppingCart, label: 'GST Billing & POS', path: '/sales' },
     { icon: ReceiptText, label: 'Invoices', path: '/sales/log' },
     { icon: ShoppingBag, label: 'Purchase Orders', path: '/purchases' },
+    { icon: Truck, label: 'Supplier Vendors', path: '/suppliers' },
     { icon: PieChart, label: 'Reports', path: '/reports' },
     { icon: SettingsIcon, label: 'Settings', path: '/settings' },
 ];

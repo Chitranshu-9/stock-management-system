@@ -13,6 +13,7 @@ import POS from './pages/sales/POS';
 import Invoice from './pages/sales/Invoice';
 import SalesLog from './pages/sales/SalesLog';
 import PurchaseOrders from './pages/purchases/PurchaseOrders';
+import Suppliers from './pages/purchases/Suppliers';
 import Reports from './pages/reports/Reports';
 import Settings from './pages/settings/Settings';
 
@@ -29,6 +30,7 @@ function App() {
               <Route path="inventory" element={<ProductList />} />
               <Route path="inventory/ledger" element={<InventoryLedger />} />
               <Route path="purchases" element={<PurchaseOrders />} />
+              <Route path="suppliers" element={<Suppliers />} />
               <Route path="ai-tools" element={<AITools />} />
               <Route path="hardware-scan" element={<HardwareScanner />} />
               <Route path="sales" element={<POS />} />
