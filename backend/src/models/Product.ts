@@ -29,12 +29,12 @@ const productSchema = new Schema({
     barcode: { type: String, trim: true },
     unit: { type: String, required: true, default: 'PCS' },
     packSize: { type: String },
-    purchasePrice: { type: Number, required: true, default: 0 },
-    sellingPrice: { type: Number, required: true, default: 0 },
-    mrp: { type: Number, required: true, default: 0 },
-    gstRate: { type: Number, required: true, default: 0 },
-    currentStock: { type: Number, required: true, default: 0 },
-    reorderLevel: { type: Number, required: true, default: 10 },
+    purchasePrice: { type: Number, required: true, default: 0, min: 0 },
+    sellingPrice: { type: Number, required: true, default: 0, min: 0 },
+    mrp: { type: Number, required: true, default: 0, min: 0 },
+    gstRate: { type: Number, required: true, default: 0, min: 0, max: 100 },
+    currentStock: { type: Number, required: true, default: 0, min: 0 },
+    reorderLevel: { type: Number, required: true, default: 10, min: 0 },
     aiTrainingImages: [{ type: String }]
 }, {
     timestamps: true

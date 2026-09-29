@@ -70,21 +70,21 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
                     title="Total Inventory Value"
-                    value={`₹${stats.valuation.toLocaleString('en-IN')}`}
+                    value={`₹${(stats.valuation || 0).toLocaleString('en-IN')}`}
                     icon={<IndianRupee className="w-5 h-5 text-primary" />}
                     trend="Based on active Selling Prices"
                     goodTrend={true}
                 />
                 <Card
                     title="Products in Stock"
-                    value={stats.totalItems.toLocaleString('en-IN')}
+                    value={(stats.totalItems || 0).toLocaleString('en-IN')}
                     icon={<Package className="w-5 h-5 text-blue-500" />}
-                    trend={`${stats.skus} Unique Core SKUs tracked`}
+                    trend={`${stats.skus || 0} Unique Core SKUs tracked`}
                     goodTrend={true}
                 />
                 <Card
                     title="Today's Sales"
-                    value={`₹${stats.todaySales.toLocaleString('en-IN')}`}
+                    value={`₹${(stats.todaySales || 0).toLocaleString('en-IN')}`}
                     icon={<TrendingUp className="w-5 h-5 text-success" />}
                     trend="Transactions securely verified"
                     goodTrend={true}

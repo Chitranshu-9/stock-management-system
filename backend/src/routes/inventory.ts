@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import StockMovement from '../models/StockMovement';
 import Product from '../models/Product';
 import Invoice from '../models/Invoice';
@@ -8,7 +8,7 @@ const router = Router();
 
 // GET /api/inventory/ledger
 // Fetch the unified accounting ledger for this specific isolated business tenant
-router.get('/ledger', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/ledger', requireAuth, requireRole('admin', 'manager'), async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user.tenantId;
 
@@ -24,7 +24,7 @@ router.get('/ledger', requireAuth, async (req: Request, res: Response): Promise<
 });
 
 // GET /api/inventory/overview
-router.get('/overview', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/overview', requireAuth, requireRole('admin', 'manager'), async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user.tenantId;
 
@@ -156,10 +156,18 @@ router.post('/checkout', requireAuth, async (req: Request, res: Response): Promi
             if (!product) continue;
 
             const qty = Math.max(1, Number(item.qty) || 1);
-            const price = Number(item.price) || 0;
+            // ENFORCING SERVER-SIDE PRICE (BUG-004 FIXED)
+            const price = Number(product.sellingPrice) || 0;
+
+            // PREVENTING NEGATIVE STOCK (BUG-005 FIXED)
+            if (product.currentStock < qty) {
+                res.status(400).json({ error: `Insufficient stock for ${product.name}. Available: ${product.currentStock}, Requested: ${qty}` });
+                return;
+            }
+
             totalValuation += (qty * price);
 
-            // Removed hard bounds check to support asynchronous physical supply-chain drifts.
+            // Removed hard bounds check to support asynchronous physical supply-chain drifts is an obsolete paradigm.
             validArtifacts.push({ product, qty, price, name: item.name, id: item.id });
         }
 

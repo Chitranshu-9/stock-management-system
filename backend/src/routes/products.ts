@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import Product from '../models/Product';
 import StockMovement from '../models/StockMovement';
 import { ServiceRegistry } from '../registry/ServiceRegistry';
@@ -25,7 +25,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // POST /api/products
-router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireAuth, requireRole('admin', 'manager'), async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user.tenantId;
         const { name, sku, category, purchasePrice, sellingPrice, stockLevel } = req.body;
@@ -46,6 +46,21 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
             currentStock: Number(stockLevel) || 0,
             reorderLevel: 5
         });
+
+        if (product.currentStock > 0) {
+            await StockMovement.create({
+                tenantId,
+                productId: product._id,
+                productName: product.name,
+                type: 'Adjustment',
+                quantityIn: product.currentStock,
+                quantityOut: 0,
+                balanceAfter: product.currentStock,
+                referenceId: `INIT-${product.sku}`,
+                performedBy: (req as any).user.userId,
+                notes: 'Opening Stock Declaration'
+            });
+        }
 
         res.status(201).json(product);
     } catch (e: any) {
@@ -76,7 +91,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 // POST /api/products/ai-ingest
-router.post('/ai-ingest', requireAuth, upload.single('image'), async (req: Request, res: Response): Promise<void> => {
+router.post('/ai-ingest', requireAuth, requireRole('admin', 'manager'), upload.single('image'), async (req: Request, res: Response): Promise<void> => {
     try {
         const tenantId = (req as any).user.tenantId;
         const { name, sku, category, quantity } = req.body;

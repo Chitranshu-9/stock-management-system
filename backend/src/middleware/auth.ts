@@ -47,3 +47,15 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
         return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
     }
 };
+
+export const requireRole = (...allowedRoles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        if (!req.user || !req.user.role) {
+            return res.status(403).json({ error: 'Forbidden: Missing role identity in token' });
+        }
+        if (!allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ error: `Forbidden: Action requires one of [${allowedRoles.join(', ')}]. Current role: ${req.user.role}` });
+        }
+        next();
+    };
+};
